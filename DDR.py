@@ -10,7 +10,7 @@ import altair as alt
 W_STEAL = 1.8
 W_BLOCK = 1.4
 W_FOUL = -1.5
-W_DEFLECTION = 0.8
+W_DEFLECTION = 1.2
 ALPHA_BLEND = 0.5  # 0..1  (0 = only per36 volume, 1 = only rate)
 
 def safe_per36(value, minutes):
