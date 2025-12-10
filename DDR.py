@@ -139,12 +139,30 @@ if st.button("Générer DDR"):
 
         st.subheader("Classement DDR unifié")
         st.dataframe(
-            df_ddr.style.background_gradient(
-                subset=['DDR','DDR%','DDR/36_norm'],
-                cmap='RdYlGn',
-                low=0,
-                high=1
-            )
+            df_ddr,
+            column_config={
+                "DDR": st.column_config.NumberColumn(
+                    "DDR",
+                    help="Score final",
+                    format="%.2f",
+                    min_value=df_ddr["DDR"].min(),
+                    max_value=df_ddr["DDR"].max()
+                ),
+                "DDR%": st.column_config.NumberColumn(
+                    "DDR%",
+                    help="Efficacité défensive",
+                    format="%.2f",
+                    min_value=df_ddr["DDR%"].min(),
+                    max_value=df_ddr["DDR%"].max()
+                ),
+                "DDR/36_norm": st.column_config.NumberColumn(
+                    "DDR/36 (norm)",
+                    help="Volume défensif normalisé",
+                    format="%.2f",
+                    min_value=-10,
+                    max_value=10
+                )
+            }
         )
 
         st.download_button(
