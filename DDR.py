@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -22,7 +21,6 @@ def safe_per36(value, minutes):
 def fetch_league_leaders(season="2024-25"):
     ll = leagueleaders.LeagueLeaders(season=season, season_type_all_star="Regular Season")
     df = ll.get_data_frames()[0]
-    # On récupère aussi les fautes (PF)
     return df[['PLAYER','TEAM','GP','MIN','STL','BLK','PF']].copy()
 
 # -----------------------------
@@ -32,10 +30,15 @@ def fetch_league_leaders(season="2024-25"):
 def fetch_opp_pts_poss():
     try:
         df = pd.read_excel("opp_pts_poss.xlsx")
-        # On suppose qu'il y a une colonne PLAYER et opp_pts_poss
+        df.columns = df.columns.str.strip().str.lower()  # standardise les noms
+        df = df.rename(columns={"player": "PLAYER", "oppptsposs": "opp_pts_poss"})
+        st.success("✅ Fichier opp_pts_poss.xlsx chargé avec succès.")
+        st.write("Colonnes détectées :", list(df.columns))
+        st.write("Aperçu des 5 premières lignes :")
+        st.dataframe(df.head())
         return df[['PLAYER','opp_pts_poss']]
-    except Exception:
-        st.warning("Impossible de charger opp_pts_poss.xlsx")
+    except Exception as e:
+        st.error(f"❌ Erreur lors du chargement du fichier : {e}")
         return pd.DataFrame(columns=['PLAYER','opp_pts_poss'])
 
 # -----------------------------
@@ -74,7 +77,7 @@ st.markdown(
     }
     h1 {
         text-align: center;
-        color: red;
+        color: white;
         font-size: 50px;
     }
     .stButton button {
