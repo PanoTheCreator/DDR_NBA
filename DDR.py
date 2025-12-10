@@ -58,7 +58,7 @@ def fetch_opp_excel(path="opp_pts_poss24_25.xlsx"):
 # -----------------------------
 # Calcul DDR unifié
 # -----------------------------
-def compute_ddr(df_indiv, df_opp, alpha=0.0):
+def compute_ddr(df_indiv, df_opp):
     df = pd.merge(df_indiv, df_opp, on='PLAYER', how='left')
 
     # Remplissage valeurs manquantes
@@ -86,14 +86,11 @@ def compute_ddr(df_indiv, df_opp, alpha=0.0):
         W_DEFLECTION * df['DEFLECTIONS']
     )
 
-    # Mix taux vs volume (alpha entre -10 et +10)
-    df['DDR_blend'] = (alpha/10) * df['DDR%'] + (1 - (alpha/10)) * df['DDR/36']
-
     # Facteur contexte
     df['OppFactor'] = 1.3 - (df['OPPPTSPOSS'] / 100.0)
 
-    # DDR final
-    df['DDR'] = df['DDR_blend'] * df['OppFactor']
+    # DDR final (moyenne simple des deux composantes pondérée par contexte)
+    df['DDR'] = ((df['DDR%'] + df['DDR/36']) / 2) * df['OppFactor']
 
     # Split nom/prénom
     df['Prénom'] = df['PLAYER'].str.split().str[0]
@@ -111,7 +108,6 @@ st.title("Defensive Disruption Rate (DDR) by Pano — Unifié")
 season = st.text_input("Saison NBA API (ex: 2024-25)", value="2024-25")
 min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 50)
 selected_team = st.text_input("Équipe (laisser vide pour toutes)", value="")
-alpha_ui = st.slider("Mix taux vs volume (alpha)", -10.0, 10.0, 0.0, 0.5)
 
 @st.cache_data
 def fetch_league_leaders(season="2024-25"):
@@ -124,8 +120,8 @@ if st.button("Générer DDR"):
         df_indiv = fetch_league_leaders(season)
         df_opp = fetch_opp_excel("opp_pts_poss24_25.xlsx")  # ton nouveau fichier
 
-        # Calcul avec alpha choisi
-        df_ddr = compute_ddr(df_indiv, df_opp, alpha=alpha_ui)
+        # Calcul DDR
+        df_ddr = compute_ddr(df_indiv, df_opp)
 
         # Filtres
         if selected_team.strip():
