@@ -18,7 +18,7 @@ def safe_per36(value, minutes):
 # -----------------------------
 # Chargement OppPtsPoss + % + deflections depuis Excel
 # -----------------------------
-def fetch_opp_excel(path="opp_pts_poss.xlsx"):
+def fetch_opp_excel(path="opp_pts_poss24_25.xlsx"):
     df_opp = pd.read_excel(path)
 
     # Normalise tout en majuscules
@@ -95,7 +95,7 @@ def compute_ddr(df_indiv, df_opp, alpha=0.5):
 # -----------------------------
 # Interface Streamlit
 # -----------------------------
-st.title("Defensive Disruption Rate (DDR) by Pano — Unifié")
+st.title("Defensive Disruption Rate (DDR) by Pano")
 
 season = st.text_input("Saison NBA API (ex: 2024-25)", value="2024-25")
 min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 50)
@@ -111,7 +111,7 @@ def fetch_league_leaders(season="2024-25"):
 if st.button("Générer DDR"):
     with st.spinner("Chargement des données..."):
         df_indiv = fetch_league_leaders(season)
-        df_opp = fetch_opp_excel("opp_pts_poss.xlsx")  # relu frais à chaque run
+        df_opp = fetch_opp_excel("opp_pts_poss24_25.xlsx")  # ton nouveau fichier sur le cloud
 
         # Calcul avec alpha choisi
         df_ddr = compute_ddr(df_indiv, df_opp, alpha=alpha_ui)
