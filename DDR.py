@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -9,34 +10,55 @@ import altair as alt
 # -----------------------------
 W_STEAL = 1.5
 W_BLOCK = 1.2
+W_PF = -1.0  # les fautes pénalisent le DDR
 
 def safe_per36(value, minutes):
     return (value / minutes) * 36 if minutes and minutes > 0 else np.nan
 
 # -----------------------------
-# Récupération NBA API (steals, blocks, minutes)
+# Récupération NBA API (steals, blocks, minutes, fautes)
 # -----------------------------
 @st.cache_data
 def fetch_league_leaders(season="2024-25"):
     ll = leagueleaders.LeagueLeaders(season=season, season_type_all_star="Regular Season")
     df = ll.get_data_frames()[0]
-    return df[['PLAYER','TEAM','GP','MIN','STL','BLK']].copy()
+    # On récupère aussi les fautes (PF)
+    return df[['PLAYER','TEAM','GP','MIN','STL','BLK','PF']].copy()
 
 # -----------------------------
-# Calcul DDR (simplifié sans DBPM/DRtg)
+# Chargement du fichier opp_pts_poss.xlsx
 # -----------------------------
-def compute_ddr(df_indiv):
-    df = df_indiv.copy()
+@st.cache_data
+def fetch_opp_pts_poss():
+    try:
+        df = pd.read_excel("opp_pts_poss.xlsx")
+        # On suppose qu'il y a une colonne PLAYER et opp_pts_poss
+        return df[['PLAYER','opp_pts_poss']]
+    except Exception:
+        st.warning("Impossible de charger opp_pts_poss.xlsx")
+        return pd.DataFrame(columns=['PLAYER','opp_pts_poss'])
+
+# -----------------------------
+# Calcul DDR
+# -----------------------------
+def compute_ddr(df_indiv, df_opp):
+    df = pd.merge(df_indiv, df_opp, on='PLAYER', how='left')
+
     df['STL'] = df['STL'].fillna(0)
     df['BLK'] = df['BLK'].fillna(0)
+    df['PF'] = df['PF'].fillna(0)
+    df['opp_pts_poss'] = df['opp_pts_poss'].fillna(1.0)  # éviter division par zéro
 
-    df['RAW_DDR_EVENTS'] = W_STEAL*df['STL'] + W_BLOCK*df['BLK']
+    # Événements défensifs pondérés
+    df['RAW_DDR_EVENTS'] = W_STEAL*df['STL'] + W_BLOCK*df['BLK'] + W_PF*df['PF']
+
+    # Normalisation par 36 minutes
     df['DDR_per36'] = df.apply(lambda r: safe_per36(r['RAW_DDR_EVENTS'], r['MIN']), axis=1)
 
-    # Score final = DDR_per36 (simple version)
-    df['DDR_final'] = df['DDR_per36']
+    # Ajustement par points concédés par possession
+    df['DDR_final'] = df['DDR_per36'] / df['opp_pts_poss']
 
-    return df[['PLAYER','TEAM','MIN','STL','BLK','DDR_per36','DDR_final']].sort_values('DDR_final', ascending=False)
+    return df[['PLAYER','TEAM','MIN','STL','BLK','PF','opp_pts_poss','DDR_per36','DDR_final']].sort_values('DDR_final', ascending=False)
 
 # -----------------------------
 # 🎨 Interface Streamlit avec style violet
@@ -79,7 +101,8 @@ if st.button("Accéder à l'application"):
 
     # Chargement des données
     df_indiv = fetch_league_leaders(season)
-    df_ddr = compute_ddr(df_indiv)
+    df_opp = fetch_opp_pts_poss()
+    df_ddr = compute_ddr(df_indiv, df_opp)
 
     # --- Filtres interactifs ---
     teams = sorted(df_ddr['TEAM'].dropna().unique())
@@ -102,6 +125,6 @@ if st.button("Accéder à l'application"):
         x=alt.X('MIN', title='Minutes'),
         y=alt.Y('DDR_final', title='DDR Final'),
         color=alt.Color('TEAM', title='Équipe'),
-        tooltip=['PLAYER','TEAM','MIN','DDR_final']
+        tooltip=['PLAYER','TEAM','MIN','DDR_final','PF','opp_pts_poss']
     ).interactive()
     st.altair_chart(chart, use_container_width=True)
