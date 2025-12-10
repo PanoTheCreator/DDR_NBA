@@ -82,7 +82,7 @@ def compute_ddr(df_indiv, df_opp):
 # -----------------------------
 # Interface Streamlit
 # -----------------------------
-st.title("Defensive Disruption Rate (DDR) – Version OppPtsPoss")
+st.title("Defensive Disruption Rate (DDR) by Pano")
 
 season = st.text_input("Saison NBA API (ex: 2024-25)", value="2024-25")
 min_threshold = st.slider("Minutes minimum", 0, 500, 1000, 2000)
