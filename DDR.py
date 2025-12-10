@@ -2,121 +2,143 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from nba_api.stats.endpoints import leagueleaders
-import altair as alt
 
 # -----------------------------
 # Pondérations
 # -----------------------------
 W_STEAL = 1.5
 W_BLOCK = 1.2
-W_FOUL = -1.5
+DELTA = 0.5
+LEAGUE_AVG_DRTG = 112.0  # moyenne ligue (ajuster selon saison)
 
 def safe_per36(value, minutes):
     return (value / minutes) * 36 if minutes and minutes > 0 else np.nan
 
 # -----------------------------
-# Récupération NBA API (steals, blocks, minutes, fautes)
+# Récupération NBA API (steals, blocks, minutes)
 # -----------------------------
 @st.cache_data
 def fetch_league_leaders(season="2024-25"):
     ll = leagueleaders.LeagueLeaders(season=season, season_type_all_star="Regular Season")
     df = ll.get_data_frames()[0]
-    return df[['PLAYER','TEAM','GP','MIN','STL','BLK','PF']].copy()
+    return df[['PLAYER','TEAM','GP','MIN','STL','BLK']].copy()
 
 # -----------------------------
-# Chargement OppPtsPoss depuis Excel
+# Scraping Basketball Reference (DBPM + DRtg)
 # -----------------------------
 @st.cache_data
-def fetch_opp_excel(path="opp_pts_poss.xlsx"):
-    df_opp = pd.read_excel(path)
+def fetch_bref_stats(season="2024"):
+    url_adv = f"https://www.basketball-reference.com/leagues/NBA_{season}_advanced.html"
+    url_misc = f"https://www.basketball-reference.com/leagues/NBA_{season}_misc.html"
 
-    # Nettoyage des noms de colonnes : supprime espaces et met en majuscules
-    df_opp.columns = df_opp.columns.str.strip().str.upper()
+    # DBPM
+    try:
+        df_adv = pd.read_html(url_adv)[0]
+        if 'DBPM' in df_adv.columns:
+            df_adv = df_adv[['Player','DBPM']].copy()
+            df_adv.rename(columns={'Player':'PLAYER'}, inplace=True)
+        else:
+            df_adv = pd.DataFrame(columns=['PLAYER','DBPM'])
+    except Exception:
+        st.warning(f"Impossible de récupérer DBPM pour {season}.")
+        df_adv = pd.DataFrame(columns=['PLAYER','DBPM'])
 
-    # Vérification : si la colonne PLAYER existe bien
-    if 'PLAYER' not in df_opp.columns:
-        st.error("Le fichier Excel doit contenir une colonne 'PLAYER'. Colonnes trouvées : " + str(df_opp.columns.tolist()))
-        return pd.DataFrame(columns=['PLAYER','OPPPTSPOSS'])
+    # DRtg
+    try:
+        df_misc = pd.read_html(url_misc)[0]
+        if 'DRtg' in df_misc.columns:
+            df_misc = df_misc[['Player','DRtg']].copy()
+            df_misc.rename(columns={'Player':'PLAYER'}, inplace=True)
+        else:
+            df_misc = pd.DataFrame(columns=['PLAYER','DRtg'])
+    except Exception:
+        st.warning(f"Impossible de récupérer DRtg pour {season}.")
+        df_misc = pd.DataFrame(columns=['PLAYER','DRtg'])
 
-    return df_opp
+    # Fusion
+    df_full = pd.merge(df_adv, df_misc, on='PLAYER', how='outer')
+    return df_full
 
 # -----------------------------
 # Calcul DDR
 # -----------------------------
-def compute_ddr(df_indiv, df_opp):
-    df = pd.merge(df_indiv, df_opp, on='PLAYER', how='left')
+def compute_ddr(df_indiv, df_bref):
+    df = pd.merge(df_indiv, df_bref, on='PLAYER', how='left')
 
-    # Remplissage valeurs manquantes
-    df[['STL','BLK','PF']] = df[['STL','BLK','PF']].fillna(0)
-    df['OPPPTSPOSS'] = df['OPPPTSPOSS'].fillna(0.0)
+    df['STL'] = df['STL'].fillna(0)
+    df['BLK'] = df['BLK'].fillna(0)
 
-    # Événements perturbateurs avec fautes négatives
-    df['RAW_DDR_EVENTS'] = (
-        W_STEAL*df['STL'] +
-        W_BLOCK*df['BLK'] +
-        W_FOUL*df['PF']
-    )
-
-    # DDR par 36 minutes
+    df['RAW_DDR_EVENTS'] = W_STEAL*df['STL'] + W_BLOCK*df['BLK']
     df['DDR_per36'] = df.apply(lambda r: safe_per36(r['RAW_DDR_EVENTS'], r['MIN']), axis=1)
 
-    # DDR par possessions
-    df['DDR_per75'] = df['DDR_per36'] * (75/36)
-    df['DDR_per100'] = df['DDR_per36'] * (100/36)
+    df['DRtg_eff'] = df['DRtg'].fillna(LEAGUE_AVG_DRTG)
+    df['DRtg_factor'] = (LEAGUE_AVG_DRTG / df['DRtg_eff']).clip(lower=0.7, upper=1.3)
 
-    # Facteur OppPtsPoss (impact défensif direct)
-    df['OppFactor'] = 1.0 - (df['OPPPTSPOSS'] / 100.0)
+    df['DBPM_eff'] = df['DBPM'].fillna(0.0)
 
-    # DDR final
-    df['DDR_final'] = df['DDR_per36'] * df['OppFactor']
+    df['DDR_final'] = df['DDR_per36'] * df['DRtg_factor'] + (DELTA * df['DBPM_eff'])
 
-    # Split nom/prénom robuste
-    df['Prénom'] = df['PLAYER'].str.split().str[0]
-    df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ')
-
-    # Colonnes finales
-    df_final = df[['Prénom','Nom','TEAM','MIN','DDR_per36','DDR_per75','DDR_per100','DDR_final']]
-
-    return df_final.sort_values('DDR_final', ascending=False)
+    return df[['PLAYER','TEAM','MIN','STL','BLK','DRtg','DBPM','DDR_per36','DDR_final']].sort_values('DDR_final', ascending=False)
 
 # -----------------------------
-# Interface Streamlit
+# 🎨 Interface Streamlit avec style violet
 # -----------------------------
-st.title("Defensive Disruption Rate (DDR) – Version OppPtsPoss")
+st.markdown(
+    """
+    <style>
+    body {
+        background-color: #6A0DAD;
+    }
+    .main {
+        background-color: #6A0DAD;
+    }
+    h1 {
+        text-align: center;
+        color: white;
+        font-size: 50px;
+    }
+    .stButton button {
+        display: block;
+        margin: 0 auto;
+        background-color: white;
+        color: #6A0DAD;
+        font-weight: bold;
+        border-radius: 10px;
+        padding: 10px 20px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-season = st.text_input("Saison NBA API (ex: 2024-25)", value="2024-25")
-min_threshold = st.slider("Minutes minimum", 0, 500, 1000, 2000)
-selected_team = st.text_input("Équipe (laisser vide pour toutes)", value="")
+# 🏀 Page d'accueil
+st.markdown("<h1>DDR powered by Pano</h1>", unsafe_allow_html=True)
 
-if st.button("Générer DDR"):
-    with st.spinner("Chargement des données..."):
-        df_indiv = fetch_league_leaders(season)
-        df_opp = fetch_opp_excel("opp_pts_poss.xlsx")
-        df_ddr = compute_ddr(df_indiv, df_opp)
+if st.button("Accéder à l'application"):
+    st.success("🚀 Lancement de la génération DDR !")
 
-        # Filtres
-        if selected_team.strip():
-            df_ddr = df_ddr[df_ddr['TEAM'] == selected_team]
-        df_ddr = df_ddr[df_ddr['MIN'] >= min_threshold]
+    season = st.text_input("Saison NBA API (ex: 2024-25)", value="2024-25")
+    season_bref = st.text_input("Saison Basketball Reference (ex: 2024)", value="2024")
 
-        # Afficher directement tout le classement
-        st.subheader("Classement DDR complet")
-        st.dataframe(df_ddr)
+    # Chargement des données
+    df_indiv = fetch_league_leaders(season)
+    df_bref = fetch_bref_stats(season_bref)
+    df_ddr = compute_ddr(df_indiv, df_bref)
 
-        # Bouton de téléchargement CSV
-        st.download_button("Télécharger le classement complet",
-                           df_ddr.to_csv(index=False).encode('utf-8'),
-                           "DDR_classement.csv",
-                           "text/csv")
+    # --- Filtres interactifs ---
+    teams = sorted(df_ddr['TEAM'].dropna().unique())
+    selected_team = st.selectbox("Choisir une équipe", options=["Tous les joueurs"] + list(teams))
+    min_threshold = st.slider("Filtrer par minutes jouées (minimum)", 500, int(df_ddr['MIN'].max()), 2000)
 
-        # Scatter plot DDR_final vs DDR_per100 avec labels interactifs
-        st.subheader("Scatter Plot : DDR_final vs DDR/100 poss")
+    # Application des filtres
+    df_filtered = df_ddr.copy()
+    if selected_team != "Tous les joueurs":
+        df_filtered = df_filtered[df_filtered['TEAM'] == selected_team]
+    df_filtered = df_filtered[df_filtered['MIN'] >= min_threshold]
 
-        chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
-            x=alt.X('DDR_final', title='DDR Final'),
-            y=alt.Y('DDR_per100', title='DDR/100 poss'),
-            color=alt.Color('TEAM', title='Équipe'),  # coloration par équipe
-            tooltip=['Prénom','Nom','TEAM','MIN','DDR_final','DDR_per100']
-        ).interactive()
+    # Affichage
+    st.subheader("Classement DDR filtré")
+    st.dataframe(df_filtered.head(20))
 
-        st.altair_chart(chart, use_container_width=True)
+    st.subheader("DDR_final vs Minutes")
+    st.scatter_chart(df_filtered.set_index("PLAYER")[["MIN","DDR_final"]])
