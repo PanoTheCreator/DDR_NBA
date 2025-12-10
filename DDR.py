@@ -5,19 +5,18 @@ from nba_api.stats.endpoints import leagueleaders
 import altair as alt
 
 # -----------------------------
-# Weights and blend
+# Pondérations
 # -----------------------------
 W_STEAL = 1.8
 W_BLOCK = 1.4
 W_FOUL = -1.5
 W_DEFLECTION = 1.2
-ALPHA_BLEND = 0.5  # 0..1  (0 = only per36 volume, 1 = only rate)
 
 def safe_per36(value, minutes):
     return (value / minutes) * 36 if minutes and minutes > 0 else np.nan
 
 # -----------------------------
-# NBA API totals
+# Récupération NBA API (totaux)
 # -----------------------------
 @st.cache_data
 def fetch_league_leaders(season="2024-25"):
@@ -26,7 +25,7 @@ def fetch_league_leaders(season="2024-25"):
     return df[['PLAYER','TEAM','GP','MIN','STL','BLK','PF']].copy()
 
 # -----------------------------
-# Excel: OppPtsPoss + % + deflections
+# Chargement OppPtsPoss + % + deflections depuis Excel
 # -----------------------------
 @st.cache_data
 def fetch_opp_excel(path="opp_pts_poss.xlsx"):
@@ -37,7 +36,7 @@ def fetch_opp_excel(path="opp_pts_poss.xlsx"):
     missing = [c for c in required if c not in df_opp.columns]
     if missing:
         st.error(f"Colonnes manquantes dans Excel: {missing}. Colonnes trouvées: {df_opp.columns.tolist()}")
-        # Create empty safe frame
+        # Ajoute colonnes manquantes vides
         for c in missing:
             df_opp[c] = 0.0
         if 'PLAYER' not in df_opp.columns:
@@ -45,29 +44,29 @@ def fetch_opp_excel(path="opp_pts_poss.xlsx"):
     return df_opp
 
 # -----------------------------
-# Unified DDR compute
+# Calcul DDR unifié
 # -----------------------------
-def compute_ddr(df_indiv, df_opp):
+def compute_ddr(df_indiv, df_opp, alpha=0.5):
     df = pd.merge(df_indiv, df_opp, on='PLAYER', how='left')
 
-    # Fill missing
+    # Remplissage valeurs manquantes
     for col in ['STL','BLK','PF','MIN','OPPPTSPOSS','STL%','BLK%','PF%','DEFLECTIONS']:
         if col in df.columns:
             df[col] = df[col].fillna(0.0)
 
-    # Per-36 totals
+    # Totaux normalisés par 36
     df['STL36'] = df.apply(lambda r: safe_per36(r['STL'], r['MIN']), axis=1)
     df['BLK36'] = df.apply(lambda r: safe_per36(r['BLK'], r['MIN']), axis=1)
     df['PF36']  = df.apply(lambda r: safe_per36(r['PF'],  r['MIN']), axis=1)
 
-    # Rate component (percentages)
+    # Composante taux (%)
     df['DDR_rate'] = (
         W_STEAL * df['STL%'] +
         W_BLOCK * df['BLK%'] +
         W_FOUL  * df['PF%']
     )
 
-    # Volume component (per-36 + deflections raw per-game)
+    # Composante volume (per36 + deflections)
     df['DDR_per36'] = (
         W_STEAL * df['STL36'] +
         W_BLOCK * df['BLK36'] +
@@ -75,20 +74,20 @@ def compute_ddr(df_indiv, df_opp):
         W_DEFLECTION * df['DEFLECTIONS']
     )
 
-    # Blend
-    df['DDR_blend'] = ALPHA_BLEND * df['DDR_rate'] + (1 - ALPHA_BLEND) * df['DDR_per36']
+    # Mix taux vs volume
+    df['DDR_blend'] = alpha * df['DDR_rate'] + (1 - alpha) * df['DDR_per36']
 
-    # Context factor
+    # Facteur contexte
     df['OppFactor'] = 1.3 - (df['OPPPTSPOSS'] / 100.0)
 
-    # Final
+    # DDR final
     df['DDR_final'] = df['DDR_blend'] * df['OppFactor']
 
-    # Name split
+    # Split nom/prénom
     df['Prénom'] = df['PLAYER'].str.split().str[0]
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ')
 
-    # Output
+    # Colonnes finales
     cols = [
         'Prénom','Nom','TEAM','GP','MIN',
         'STL','BLK','PF','STL36','BLK36','PF36',
@@ -98,27 +97,24 @@ def compute_ddr(df_indiv, df_opp):
     return df[cols].sort_values('DDR_final', ascending=False)
 
 # -----------------------------
-# App
+# Interface Streamlit
 # -----------------------------
-st.title("Defensive Disruption Rate (DDR) by Pano — Unified")
+st.title("Defensive Disruption Rate (DDR) by Pano — Unifié")
 
 season = st.text_input("Saison NBA API (ex: 2024-25)", value="2024-25")
-min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 50)  # start simple: default 500
+min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 50)
 selected_team = st.text_input("Équipe (laisser vide pour toutes)", value="")
-alpha_ui = st.slider("Mix taux vs volume (alpha)", 0.0, 1.0, ALPHA_BLEND, 0.05)
+alpha_ui = st.slider("Mix taux vs volume (alpha)", 0.0, 1.0, 0.5, 0.05)
 
 if st.button("Générer DDR"):
     with st.spinner("Chargement des données..."):
         df_indiv = fetch_league_leaders(season)
         df_opp = fetch_opp_excel("opp_pts_poss.xlsx")
 
-        # Override alpha from UI
-        global ALPHA_BLEND
-        ALPHA_BLEND = alpha_ui
+        # Calcul avec alpha choisi
+        df_ddr = compute_ddr(df_indiv, df_opp, alpha=alpha_ui)
 
-        df_ddr = compute_ddr(df_indiv, df_opp)
-
-        # Filters
+        # Filtres
         if selected_team.strip():
             df_ddr = df_ddr[df_ddr['TEAM'] == selected_team]
         df_ddr = df_ddr[df_ddr['MIN'] >= min_threshold]
