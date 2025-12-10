@@ -58,7 +58,7 @@ def fetch_opp_excel(path="opp_pts_poss24_25.xlsx"):
 # -----------------------------
 # Calcul DDR unifié
 # -----------------------------
-def compute_ddr(df_indiv, df_opp, alpha=0.5):
+def compute_ddr(df_indiv, df_opp, alpha=0.0):
     df = pd.merge(df_indiv, df_opp, on='PLAYER', how='left')
 
     # Remplissage valeurs manquantes
@@ -86,8 +86,13 @@ def compute_ddr(df_indiv, df_opp, alpha=0.5):
         W_DEFLECTION * df['DEFLECTIONS']
     )
 
-    # Mix taux vs volume
-    df['DDR_blend'] = alpha * df['DDR%'] + (1 - alpha) * df['DDR/36']
+    # Normalisation DDR/36 entre -10 et +10
+    min_val = df['DDR/36'].min()
+    max_val = df['DDR/36'].max()
+    df['DDR/36_norm'] = -10 + (df['DDR/36'] - min_val) * (20 / (max_val - min_val))
+
+    # Mix taux vs volume (alpha entre -10 et +10)
+    df['DDR_blend'] = (alpha/10) * df['DDR%'] + (1 - (alpha/10)) * df['DDR/36_norm']
 
     # Facteur contexte
     df['OppFactor'] = 1.3 - (df['OPPPTSPOSS'] / 100.0)
@@ -100,7 +105,7 @@ def compute_ddr(df_indiv, df_opp, alpha=0.5):
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ')
 
     # Colonnes finales réduites
-    df_final = df[['Prénom','Nom','MIN','DDR%','DDR/36','DDR']]
+    df_final = df[['Prénom','Nom','MIN','DDR%','DDR/36_norm','DDR']]
     return df_final.sort_values('DDR', ascending=False)
 
 # -----------------------------
@@ -111,7 +116,7 @@ st.title("Defensive Disruption Rate (DDR) by Pano — Unifié")
 season = st.text_input("Saison NBA API (ex: 2024-25)", value="2024-25")
 min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 50)
 selected_team = st.text_input("Équipe (laisser vide pour toutes)", value="")
-alpha_ui = st.slider("Mix taux vs volume (alpha)", 0.0, 1.0, 0.5, 0.05)
+alpha_ui = st.slider("Mix taux vs volume (alpha)", -10.0, 10.0, 0.0, 0.5)
 
 @st.cache_data
 def fetch_league_leaders(season="2024-25"):
@@ -133,7 +138,14 @@ if st.button("Générer DDR"):
         df_ddr = df_ddr[df_ddr['MIN'] >= min_threshold]
 
         st.subheader("Classement DDR unifié")
-        st.dataframe(df_ddr)
+        st.dataframe(
+            df_ddr.style.background_gradient(
+                subset=['DDR','DDR%','DDR/36_norm'],
+                cmap='RdYlGn',
+                low=0,
+                high=1
+            )
+        )
 
         st.download_button(
             "Télécharger le classement complet",
@@ -142,11 +154,11 @@ if st.button("Générer DDR"):
             "text/csv"
         )
 
-        st.subheader("Scatter : DDR vs DDR/36")
+        st.subheader("Scatter : DDR vs DDR/36 (normalisé)")
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
             x=alt.X('DDR', title='DDR'),
-            y=alt.Y('DDR/36', title='DDR/36'),
+            y=alt.Y('DDR/36_norm', title='DDR/36 (normalisé -10 à +10)'),
             color=alt.Color('Nom', title='Joueur'),
-            tooltip=['Prénom','Nom','MIN','DDR','DDR%','DDR/36']
+            tooltip=['Prénom','Nom','MIN','DDR','DDR%','DDR/36_norm']
         ).interactive()
         st.altair_chart(chart, use_container_width=True)
