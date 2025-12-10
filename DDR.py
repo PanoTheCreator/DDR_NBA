@@ -24,7 +24,7 @@ def fetch_opp_excel(path="opp_pts_poss24_25.xlsx"):
     # Normalise tout en majuscules
     df_opp.columns = df_opp.columns.str.strip().str.upper()
 
-    # Harmonisation des noms (selon ton fichier)
+    # Harmonisation des noms
     df_opp = df_opp.rename(columns={
         'OPP_PTS_POSS': 'OPPPTSPOSS',
         'DEFLECTIONS': 'DEFLECTIONS',
@@ -33,7 +33,18 @@ def fetch_opp_excel(path="opp_pts_poss24_25.xlsx"):
         'BLK%': 'BLK%'
     })
 
-    # Vérifie que toutes les colonnes nécessaires sont présentes
+    # Conversion en numérique
+    for col in ['STL%','BLK%','PF%','DEFLECTIONS','OPPPTSPOSS']:
+        if col in df_opp.columns:
+            df_opp[col] = (
+                df_opp[col]
+                .astype(str)                # force en string
+                .str.replace('%','')        # enlève le symbole %
+                .str.replace(',','.')       # remplace virgule par point
+            )
+            df_opp[col] = pd.to_numeric(df_opp[col], errors='coerce')
+
+    # Vérifie colonnes nécessaires
     required = ['PLAYER','OPPPTSPOSS','STL%','BLK%','PF%','DEFLECTIONS']
     missing = [c for c in required if c not in df_opp.columns]
     if missing:
@@ -111,7 +122,7 @@ def fetch_league_leaders(season="2024-25"):
 if st.button("Générer DDR"):
     with st.spinner("Chargement des données..."):
         df_indiv = fetch_league_leaders(season)
-        df_opp = fetch_opp_excel("opp_pts_poss24_25.xlsx")  # ton nouveau fichier sur le cloud
+        df_opp = fetch_opp_excel("opp_pts_poss24_25.xlsx")  # ton nouveau fichier
 
         # Calcul avec alpha choisi
         df_ddr = compute_ddr(df_indiv, df_opp, alpha=alpha_ui)
