@@ -86,13 +86,8 @@ def compute_ddr(df_indiv, df_opp, alpha=0.0):
         W_DEFLECTION * df['DEFLECTIONS']
     )
 
-    # Normalisation DDR/36 entre -10 et +10
-    min_val = df['DDR/36'].min()
-    max_val = df['DDR/36'].max()
-    df['DDR/36_norm'] = -10 + (df['DDR/36'] - min_val) * (20 / (max_val - min_val))
-
     # Mix taux vs volume (alpha entre -10 et +10)
-    df['DDR_blend'] = (alpha/10) * df['DDR%'] + (1 - (alpha/10)) * df['DDR/36_norm']
+    df['DDR_blend'] = (alpha/10) * df['DDR%'] + (1 - (alpha/10)) * df['DDR/36']
 
     # Facteur contexte
     df['OppFactor'] = 1.3 - (df['OPPPTSPOSS'] / 100.0)
@@ -105,7 +100,7 @@ def compute_ddr(df_indiv, df_opp, alpha=0.0):
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ')
 
     # Colonnes finales réduites
-    df_final = df[['Prénom','Nom','MIN','DDR%','DDR/36_norm','DDR']]
+    df_final = df[['Prénom','Nom','MIN','DDR%','DDR/36','DDR']]
     return df_final.sort_values('DDR', ascending=False)
 
 # -----------------------------
@@ -155,12 +150,12 @@ if st.button("Générer DDR"):
                     min_value=df_ddr["DDR%"].min(),
                     max_value=df_ddr["DDR%"].max()
                 ),
-                "DDR/36_norm": st.column_config.NumberColumn(
-                    "DDR/36 (norm)",
-                    help="Volume défensif normalisé",
+                "DDR/36": st.column_config.NumberColumn(
+                    "DDR/36",
+                    help="Volume défensif extrapolé par 36 minutes",
                     format="%.2f",
-                    min_value=-10,
-                    max_value=10
+                    min_value=df_ddr["DDR/36"].min(),
+                    max_value=df_ddr["DDR/36"].max()
                 )
             }
         )
@@ -172,11 +167,11 @@ if st.button("Générer DDR"):
             "text/csv"
         )
 
-        st.subheader("Scatter : DDR vs DDR/36 (normalisé)")
+        st.subheader("Scatter : DDR vs DDR/36")
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
             x=alt.X('DDR', title='DDR'),
-            y=alt.Y('DDR/36_norm', title='DDR/36 (normalisé -10 à +10)'),
+            y=alt.Y('DDR/36', title='DDR/36'),
             color=alt.Color('Nom', title='Joueur'),
-            tooltip=['Prénom','Nom','MIN','DDR','DDR%','DDR/36_norm']
+            tooltip=['Prénom','Nom','MIN','DDR','DDR%','DDR/36']
         ).interactive()
         st.altair_chart(chart, use_container_width=True)
