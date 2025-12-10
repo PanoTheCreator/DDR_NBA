@@ -18,11 +18,36 @@ def safe_per36(value, minutes):
 # -----------------------------
 # Récupération NBA API (totaux)
 # -----------------------------
+
 @st.cache_data
-def fetch_league_leaders(season="2024-25"):
-    ll = leagueleaders.LeagueLeaders(season=season, season_type_all_star="Regular Season")
-    df = ll.get_data_frames()[0]
-    return df[['PLAYER','TEAM','GP','MIN','STL','BLK','PF']].copy()
+def fetch_opp_excel(path="opp_pts_poss.xlsx"):
+    df_opp = pd.read_excel(path)
+
+    # Normalise tout en majuscules
+    
+    df_opp.columns = df_opp.columns.str.strip().str.upper()
+
+    # Harmonisation des noms (selon ton fichier)
+    
+    df_opp = df_opp.rename(columns={
+        'OPP_PTS_POSS': 'OPPPTSPOSS',
+        'OPPPTSPOSS': 'OPPPTSPOSS',
+        'DEFLECTIONS': 'DEFLECTIONS',
+        'FOUL%': 'PF%',
+        'STL%': 'STL%',
+        'BLK%': 'BLK%'
+    })
+
+    # Vérifie que toutes les colonnes nécessaires sont présentes
+    required = ['PLAYER','OPPPTSPOSS','STL%','BLK%','PF%','DEFLECTIONS']
+    missing = [c for c in required if c not in df_opp.columns]
+    if missing:
+        st.error(f"Colonnes manquantes dans Excel: {missing}. Colonnes trouvées: {df_opp.columns.tolist()}")
+        for c in missing:
+            df_opp[c] = 0.0
+        if 'PLAYER' not in df_opp.columns:
+            df_opp['PLAYER'] = ""
+    return df_opp
 
 # -----------------------------
 # Chargement OppPtsPoss + % + deflections depuis Excel
