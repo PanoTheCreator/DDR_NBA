@@ -68,12 +68,13 @@ def compute_ddr(df_indiv, df_opp):
         if col in df.columns:
             df[col] = df[col].fillna(0.0)
 
-    # DDR% (efficacité relative)
-    df['DDR%'] = (
+    # DDR-E (efficacité relative, pondérée, mis à l'échelle)
+    df['DDR-E'] = (
         W_STEAL * df['STL%'] +
         W_BLOCK * df['BLK%'] +
         W_FOUL  * df['PF%']
     )
+    df['DDR-E'] = df['DDR-E'] * 1000  # mise à l'échelle pour lisibilité (-100 à +100)
 
     # DDR-V (volume par match)
     df['DDR-V'] = (
@@ -87,15 +88,18 @@ def compute_ddr(df_indiv, df_opp):
     df['OppFactor'] = 1.3 - (df['OPPPTSPOSS'] / 100.0)
     df['OppFactor'] = df['OppFactor'].clip(lower=0.6, upper=1.4)
 
-    # DDR final = moyenne des deux composantes * contexte
-    df['DDR'] = ((df['DDR%'] + df['DDR-V']) / 2) * df['OppFactor']
+    # DDR final = rapport efficacité / volume * contexte
+    # On ajoute une petite sécurité pour éviter la division par zéro
+    df['DDR'] = np.where(df['DDR-V'] != 0,
+                         (df['DDR-E'] / df['DDR-V']) * df['OppFactor'],
+                         np.nan)
 
     # Split nom/prénom
     df['Prénom'] = df['PLAYER'].str.split().str[0]
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ')
 
     # Colonnes finales réduites
-    df_final = df[['Prénom','Nom','MIN','DDR%','DDR-V','DDR']]
+    df_final = df[['Prénom','Nom','MIN','DDR-E','DDR-V','DDR']]
     return df_final.sort_values('DDR', ascending=False)
 
 # -----------------------------
@@ -132,17 +136,17 @@ if st.button("Générer DDR"):
             column_config={
                 "DDR": st.column_config.NumberColumn(
                     "DDR",
-                    help="Score final (moyenne efficacité + volume, corrigée par contexte)",
+                    help="Score final = efficacité / volume, corrigé par contexte",
                     format="%.2f",
                     min_value=df_ddr["DDR"].min(),
                     max_value=df_ddr["DDR"].max()
                 ),
-                "DDR%": st.column_config.NumberColumn(
-                    "DDR%",
-                    help="Efficacité défensive (pourcentages en décimales, fautes négatives)",
-                    format="%.3f",
-                    min_value=df_ddr["DDR%"].min(),
-                    max_value=df_ddr["DDR%"].max()
+                "DDR-E": st.column_config.NumberColumn(
+                    "DDR-E",
+                    help="Efficacité défensive pondérée (échelle -100 à +100, fautes négatives)",
+                    format="%.1f",
+                    min_value=df_ddr["DDR-E"].min(),
+                    max_value=df_ddr["DDR-E"].max()
                 ),
                 "DDR-V": st.column_config.NumberColumn(
                     "DDR-V",
@@ -163,9 +167,9 @@ if st.button("Générer DDR"):
 
         st.subheader("Scatter : DDR vs DDR-V")
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
-            x=alt.X('DDR', title='DDR'),
+            x=alt.X('DDR', title='DDR (efficacité/volume)'),
             y=alt.Y('DDR-V', title='DDR-V (volume par match)'),
             color=alt.Color('Nom', title='Joueur'),
-            tooltip=['Prénom','Nom','MIN','DDR','DDR%','DDR-V']
+            tooltip=['Prénom','Nom','MIN','DDR','DDR-E','DDR-V']
         ).interactive()
         st.altair_chart(chart, use_container_width=True)
