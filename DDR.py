@@ -16,22 +16,17 @@ def safe_per36(value, minutes):
     return (value / minutes) * 36 if minutes and minutes > 0 else np.nan
 
 # -----------------------------
-# Récupération NBA API (totaux)
+# Chargement OppPtsPoss + % + deflections depuis Excel
 # -----------------------------
-
-@st.cache_data
 def fetch_opp_excel(path="opp_pts_poss.xlsx"):
     df_opp = pd.read_excel(path)
 
     # Normalise tout en majuscules
-    
     df_opp.columns = df_opp.columns.str.strip().str.upper()
 
     # Harmonisation des noms (selon ton fichier)
-    
     df_opp = df_opp.rename(columns={
         'OPP_PTS_POSS': 'OPPPTSPOSS',
-        'OPPPTSPOSS': 'OPPPTSPOSS',
         'DEFLECTIONS': 'DEFLECTIONS',
         'FOUL%': 'PF%',
         'STL%': 'STL%',
@@ -39,36 +34,6 @@ def fetch_opp_excel(path="opp_pts_poss.xlsx"):
     })
 
     # Vérifie que toutes les colonnes nécessaires sont présentes
-    required = ['PLAYER','OPPPTSPOSS','STL%','BLK%','PF%','DEFLECTIONS']
-    missing = [c for c in required if c not in df_opp.columns]
-    if missing:
-        st.error(f"Colonnes manquantes dans Excel: {missing}. Colonnes trouvées: {df_opp.columns.tolist()}")
-        for c in missing:
-            df_opp[c] = 0.0
-        if 'PLAYER' not in df_opp.columns:
-            df_opp['PLAYER'] = ""
-    return df_opp
-
-# -----------------------------
-# Chargement OppPtsPoss + % + deflections depuis Excel
-# -----------------------------
-@st.cache_data
-def fetch_opp_excel(path="opp_pts_poss.xlsx"):
-    df_opp = pd.read_excel(path)
-
-    # Nettoyage des noms de colonnes
-    df_opp.columns = df_opp.columns.str.strip().str.upper()
-
-    # Harmonisation des noms
-    df_opp = df_opp.rename(columns={
-        'OPP_PTS_POSS': 'OPPPTSPOSS',
-        'DEFLECTIONS': 'DEFLECTIONS',
-        'FOUL%': 'PF%',
-        'STL%': 'STL%',
-        'BLK%': 'BLK%'
-    })
-
-    # Vérifie que toutes les colonnes nécessaires sont là
     required = ['PLAYER','OPPPTSPOSS','STL%','BLK%','PF%','DEFLECTIONS']
     missing = [c for c in required if c not in df_opp.columns]
     if missing:
@@ -146,7 +111,7 @@ def fetch_league_leaders(season="2024-25"):
 if st.button("Générer DDR"):
     with st.spinner("Chargement des données..."):
         df_indiv = fetch_league_leaders(season)
-        df_opp = fetch_opp_excel("opp_pts_poss.xlsx")
+        df_opp = fetch_opp_excel("opp_pts_poss.xlsx")  # relu frais à chaque run
 
         # Calcul avec alpha choisi
         df_ddr = compute_ddr(df_indiv, df_opp, alpha=alpha_ui)
@@ -169,7 +134,7 @@ if st.button("Générer DDR"):
         st.subheader("Scatter : DDR_final vs DDR_per36")
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
             x=alt.X('DDR_final', title='DDR Final'),
-            y=alt.Y('DDR_per36', title='DDR (taux)'),
+            y=alt.Y('DDR_per36', title='DDR/36'),
             color=alt.Color('Nom', title='Team'),
             tooltip=['Prénom','Nom','MIN','DDR_final','DDR_rate','DDR_per36']
         ).interactive()
