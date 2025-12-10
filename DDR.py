@@ -12,9 +12,6 @@ W_BLOCK = 1.4
 W_FOUL = -1.5
 W_DEFLECTION = 1.2
 
-def safe_per36(value, minutes):
-    return (value / minutes) * 36 if minutes and minutes > 0 else np.nan
-
 # -----------------------------
 # Chargement OppPtsPoss + % + deflections depuis Excel
 # -----------------------------
@@ -66,11 +63,6 @@ def compute_ddr(df_indiv, df_opp):
         if col in df.columns:
             df[col] = df[col].fillna(0.0)
 
-    # Totaux normalisés par 36
-    df['STL36'] = df.apply(lambda r: safe_per36(r['STL'], r['MIN']), axis=1)
-    df['BLK36'] = df.apply(lambda r: safe_per36(r['BLK'], r['MIN']), axis=1)
-    df['PF36']  = df.apply(lambda r: safe_per36(r['PF'],  r['MIN']), axis=1)
-
     # Composante taux (%)
     df['DDR%'] = (
         W_STEAL * df['STL%'] +
@@ -78,26 +70,27 @@ def compute_ddr(df_indiv, df_opp):
         W_FOUL  * df['PF%']
     )
 
-    # Composante volume (per36 + deflections)
-    df['DDR/36'] = (
-        W_STEAL * df['STL36'] +
-        W_BLOCK * df['BLK36'] +
-        W_FOUL  * df['PF36']  +
+    # Composante volume brut (actions totales)
+    df['DDR-V'] = (
+        W_STEAL * df['STL'] +
+        W_BLOCK * df['BLK'] +
+        W_FOUL  * df['PF']  +
         W_DEFLECTION * df['DEFLECTIONS']
     )
 
-    # Facteur contexte
+    # Facteur contexte borné entre 0.6 et 1.4
     df['OppFactor'] = 1.3 - (df['OPPPTSPOSS'] / 100.0)
+    df['OppFactor'] = df['OppFactor'].clip(lower=0.6, upper=1.4)
 
-    # DDR final (moyenne simple des deux composantes pondérée par contexte)
-    df['DDR'] = ((df['DDR%'] + df['DDR/36']) / 2) * df['OppFactor']
+    # DDR final = moyenne des deux composantes * contexte
+    df['DDR'] = ((df['DDR%'] + df['DDR-V']) / 2) * df['OppFactor']
 
     # Split nom/prénom
     df['Prénom'] = df['PLAYER'].str.split().str[0]
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ')
 
     # Colonnes finales réduites
-    df_final = df[['Prénom','Nom','MIN','DDR%','DDR/36','DDR']]
+    df_final = df[['Prénom','Nom','MIN','DDR%','DDR-V','DDR']]
     return df_final.sort_values('DDR', ascending=False)
 
 # -----------------------------
@@ -118,7 +111,7 @@ def fetch_league_leaders(season="2024-25"):
 if st.button("Générer DDR"):
     with st.spinner("Chargement des données..."):
         df_indiv = fetch_league_leaders(season)
-        df_opp = fetch_opp_excel("opp_pts_poss24_25.xlsx")  # ton nouveau fichier
+        df_opp = fetch_opp_excel("opp_pts_poss24_25.xlsx")  # ton fichier Excel
 
         # Calcul DDR
         df_ddr = compute_ddr(df_indiv, df_opp)
@@ -146,12 +139,12 @@ if st.button("Générer DDR"):
                     min_value=df_ddr["DDR%"].min(),
                     max_value=df_ddr["DDR%"].max()
                 ),
-                "DDR/36": st.column_config.NumberColumn(
-                    "DDR/36",
-                    help="Volume défensif extrapolé par 36 minutes",
+                "DDR-V": st.column_config.NumberColumn(
+                    "DDR-V",
+                    help="Volume défensif brut",
                     format="%.2f",
-                    min_value=df_ddr["DDR/36"].min(),
-                    max_value=df_ddr["DDR/36"].max()
+                    min_value=df_ddr["DDR-V"].min(),
+                    max_value=df_ddr["DDR-V"].max()
                 )
             }
         )
@@ -163,11 +156,11 @@ if st.button("Générer DDR"):
             "text/csv"
         )
 
-        st.subheader("Scatter : DDR vs DDR/36")
+        st.subheader("Scatter : DDR vs DDR-V")
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
             x=alt.X('DDR', title='DDR'),
-            y=alt.Y('DDR/36', title='DDR/36'),
+            y=alt.Y('DDR-V', title='DDR-V (volume brut)'),
             color=alt.Color('Nom', title='Joueur'),
-            tooltip=['Prénom','Nom','MIN','DDR','DDR%','DDR/36']
+            tooltip=['Prénom','Nom','MIN','DDR','DDR%','DDR-V']
         ).interactive()
         st.altair_chart(chart, use_container_width=True)
