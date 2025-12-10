@@ -10,18 +10,15 @@ import altair as alt
 W_STEAL = 1.8
 W_BLOCK = 1.4
 W_FOUL = -1.5
-W_DEFLECTION = 1.0  # ajusté pour éviter que ça domine trop
+W_DEFLECTION = 1.0
 
 # -----------------------------
 # Chargement OppPtsPoss + % + deflections depuis Excel
 # -----------------------------
 def fetch_opp_excel(path="opp_pts_poss24_25.xlsx"):
     df_opp = pd.read_excel(path)
-
-    # Normalise tout en majuscules
     df_opp.columns = df_opp.columns.str.strip().str.upper()
 
-    # Harmonisation des noms
     df_opp = df_opp.rename(columns={
         'OPP_PTS_POSS': 'OPPPTSPOSS',
         'DEFLECTIONS': 'DEFLECTIONS',
@@ -30,7 +27,6 @@ def fetch_opp_excel(path="opp_pts_poss24_25.xlsx"):
         'BLK%': 'BLK%'
     })
 
-    # Conversion en numérique
     for col in ['STL%','BLK%','PF%','DEFLECTIONS','OPPPTSPOSS']:
         if col in df_opp.columns:
             df_opp[col] = (
@@ -41,12 +37,10 @@ def fetch_opp_excel(path="opp_pts_poss24_25.xlsx"):
             )
             df_opp[col] = pd.to_numeric(df_opp[col], errors='coerce')
 
-    # Convertir % en décimales
     for col in ['STL%','BLK%','PF%']:
         if col in df_opp.columns:
             df_opp[col] = df_opp[col] / 100.0
 
-    # Vérifie colonnes nécessaires
     required = ['PLAYER','OPPPTSPOSS','STL%','BLK%','PF%','DEFLECTIONS']
     missing = [c for c in required if c not in df_opp.columns]
     if missing:
@@ -63,49 +57,47 @@ def fetch_opp_excel(path="opp_pts_poss24_25.xlsx"):
 def compute_ddr(df_indiv, df_opp):
     df = pd.merge(df_indiv, df_opp, on='PLAYER', how='left')
 
-    # Remplissage valeurs manquantes
     for col in ['STL','BLK','PF','MIN','GP','OPPPTSPOSS','STL%','BLK%','PF%','DEFLECTIONS']:
         if col in df.columns:
             df[col] = df[col].fillna(0.0)
 
-    # DDR-E (efficacité relative, pondérée, mis à l'échelle)
+    # DDR-E (efficacité pondérée, mis à l'échelle)
     df['DDR-E'] = (
         W_STEAL * df['STL%'] +
         W_BLOCK * df['BLK%'] +
         W_FOUL  * df['PF%']
     )
-    df['DDR-E'] = df['DDR-E'] * 1000  # mise à l'échelle pour lisibilité (-100 à +100)
+    df['DDR-E'] = df['DDR-E'] * 1000
 
-    # DDR-V (volume par match)
-    df['DDR-V'] = (
-        W_STEAL * (df['STL'] / df['GP']) +
-        W_BLOCK * (df['BLK'] / df['GP']) +
-        W_FOUL  * (df['PF']  / df['GP']) +
-        W_DEFLECTION * (df['DEFLECTIONS'] / df['GP'])
+    # Volume positif et négatif pondérés
+    df['VolPos'] = (
+        W_STEAL * df['STL'] +
+        W_BLOCK * df['BLK'] +
+        W_DEFLECTION * df['DEFLECTIONS']
     )
+    df['VolNeg'] = abs(W_FOUL) * df['PF']
 
-    # Facteur contexte borné entre 0.6 et 1.4
-    df['OppFactor'] = 1.3 - (df['OPPPTSPOSS'] / 100.0)
-    df['OppFactor'] = df['OppFactor'].clip(lower=0.6, upper=1.4)
+    # Contexte individuel (lié à DDR-E)
+    df['ContextE'] = np.where(df['DDR-E'] > 0, 1.1, 0.9)
 
-    # DDR final = rapport efficacité / volume * contexte
-    # On ajoute une petite sécurité pour éviter la division par zéro
-    df['DDR'] = np.where(df['DDR-V'] != 0,
-                         (df['DDR-E'] / df['DDR-V']) * df['OppFactor'],
+    # Contexte collectif (lié à OppPtsPoss)
+    df['ContextTeam'] = np.where(df['OPPPTSPOSS'] < 100, 1.1, 0.9)
+
+    # DDR final = rapport VolPos / VolNeg × double contexte
+    df['DDR'] = np.where(df['VolNeg'] != 0,
+                         (df['VolPos'] / df['VolNeg']) * df['ContextE'] * df['ContextTeam'],
                          np.nan)
 
-    # Split nom/prénom
     df['Prénom'] = df['PLAYER'].str.split().str[0]
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ')
 
-    # Colonnes finales réduites
-    df_final = df[['Prénom','Nom','MIN','DDR-E','DDR-V','DDR']]
+    df_final = df[['Prénom','Nom','MIN','DDR-E','DDR']]
     return df_final.sort_values('DDR', ascending=False)
 
 # -----------------------------
 # Interface Streamlit
 # -----------------------------
-st.title("Defensive Disruption Rate (DDR) by Pano — Unifié")
+st.title("Defensive Disruption Rate (DDR) by Pano — Double Contexte")
 
 season = st.text_input("Saison NBA API (ex: 2024-25)", value="2024-25")
 min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 50)
@@ -120,23 +112,21 @@ def fetch_league_leaders(season="2024-25"):
 if st.button("Générer DDR"):
     with st.spinner("Chargement des données..."):
         df_indiv = fetch_league_leaders(season)
-        df_opp = fetch_opp_excel("opp_pts_poss24_25.xlsx")  # ton fichier Excel
+        df_opp = fetch_opp_excel("opp_pts_poss24_25.xlsx")
 
-        # Calcul DDR
         df_ddr = compute_ddr(df_indiv, df_opp)
 
-        # Filtres
         if selected_team.strip():
             df_ddr = df_ddr[df_ddr['TEAM'] == selected_team]
         df_ddr = df_ddr[df_ddr['MIN'] >= min_threshold]
 
-        st.subheader("Classement DDR unifié")
+        st.subheader("Classement DDR unifié (double contexte)")
         st.dataframe(
             df_ddr,
             column_config={
                 "DDR": st.column_config.NumberColumn(
                     "DDR",
-                    help="Score final = efficacité / volume, corrigé par contexte",
+                    help="Score final = (VolPos/VolNeg) × ContextE × ContextTeam",
                     format="%.2f",
                     min_value=df_ddr["DDR"].min(),
                     max_value=df_ddr["DDR"].max()
@@ -147,13 +137,6 @@ if st.button("Générer DDR"):
                     format="%.1f",
                     min_value=df_ddr["DDR-E"].min(),
                     max_value=df_ddr["DDR-E"].max()
-                ),
-                "DDR-V": st.column_config.NumberColumn(
-                    "DDR-V",
-                    help="Volume défensif par match (fautes négatives)",
-                    format="%.2f",
-                    min_value=df_ddr["DDR-V"].min(),
-                    max_value=df_ddr["DDR-V"].max()
                 )
             }
         )
@@ -161,15 +144,28 @@ if st.button("Générer DDR"):
         st.download_button(
             "Télécharger le classement complet",
             df_ddr.to_csv(index=False).encode('utf-8'),
-            "DDR_unifie.csv",
+            "DDR_double_contexte.csv",
             "text/csv"
         )
 
-        st.subheader("Scatter : DDR vs DDR-V")
+        st.subheader("Scatter : DDR vs DDR-E")
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
-            x=alt.X('DDR', title='DDR (efficacité/volume)'),
-            y=alt.Y('DDR-V', title='DDR-V (volume par match)'),
+            x=alt.X('DDR', title='DDR (VolPos/VolNeg × ContextE × ContextTeam)'),
+            y=alt.Y('DDR-E', title='DDR-E (efficacité pondérée)'),
             color=alt.Color('Nom', title='Joueur'),
-            tooltip=['Prénom','Nom','MIN','DDR','DDR-E','DDR-V']
+            tooltip=['Prénom','Nom','MIN','DDR','DDR-E']
         ).interactive()
         st.altair_chart(chart, use_container_width=True)
+
+        st.subheader("Histogramme de la distribution des DDR")
+        hist = alt.Chart(df_ddr).mark_bar().encode(
+            alt.X("DDR", bin=alt.Bin(maxbins=30), title="DDR"),
+            alt.Y("count()", title="Nombre de joueurs"),
+            tooltip=["count()"]
+        ).properties(
+            width=600,
+            height=400
+        )
+        st.altair_chart(hist, use_container_width=True)
+
+
