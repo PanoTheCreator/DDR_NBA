@@ -38,9 +38,9 @@ def fetch_opp_excel(path="opp_pts_poss24_25.xlsx"):
         if col in df_opp.columns:
             df_opp[col] = (
                 df_opp[col]
-                .astype(str)                # force en string
-                .str.replace('%','')        # enlève le symbole %
-                .str.replace(',','.')       # remplace virgule par point
+                .astype(str)
+                .str.replace('%','')
+                .str.replace(',','.')
             )
             df_opp[col] = pd.to_numeric(df_opp[col], errors='coerce')
 
@@ -72,14 +72,14 @@ def compute_ddr(df_indiv, df_opp, alpha=0.5):
     df['PF36']  = df.apply(lambda r: safe_per36(r['PF'],  r['MIN']), axis=1)
 
     # Composante taux (%)
-    df['DDR_rate'] = (
+    df['DDR%'] = (
         W_STEAL * df['STL%'] +
         W_BLOCK * df['BLK%'] +
         W_FOUL  * df['PF%']
     )
 
     # Composante volume (per36 + deflections)
-    df['DDR_per36'] = (
+    df['DDR/36'] = (
         W_STEAL * df['STL36'] +
         W_BLOCK * df['BLK36'] +
         W_FOUL  * df['PF36']  +
@@ -87,26 +87,26 @@ def compute_ddr(df_indiv, df_opp, alpha=0.5):
     )
 
     # Mix taux vs volume
-    df['DDR_blend'] = alpha * df['DDR_rate'] + (1 - alpha) * df['DDR_per36']
+    df['DDR_blend'] = alpha * df['DDR%'] + (1 - alpha) * df['DDR/36']
 
     # Facteur contexte
     df['OppFactor'] = 1.3 - (df['OPPPTSPOSS'] / 100.0)
 
     # DDR final
-    df['DDR_final'] = df['DDR_blend'] * df['OppFactor']
+    df['DDR'] = df['DDR_blend'] * df['OppFactor']
 
     # Split nom/prénom
     df['Prénom'] = df['PLAYER'].str.split().str[0]
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ')
 
     # Colonnes finales réduites
-    df_final = df[['Prénom','Nom','MIN','DDR_rate','DDR_per36','DDR_final']]
-    return df_final.sort_values('DDR_final', ascending=False)
+    df_final = df[['Prénom','Nom','MIN','DDR%','DDR/36','DDR']]
+    return df_final.sort_values('DDR', ascending=False)
 
 # -----------------------------
 # Interface Streamlit
 # -----------------------------
-st.title("Defensive Disruption Rate (DDR) by Pano")
+st.title("Defensive Disruption Rate (DDR) by Pano — Unifié")
 
 season = st.text_input("Saison NBA API (ex: 2024-25)", value="2024-25")
 min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 50)
@@ -142,11 +142,11 @@ if st.button("Générer DDR"):
             "text/csv"
         )
 
-        st.subheader("Scatter : DDR_final vs DDR_per36")
+        st.subheader("Scatter : DDR vs DDR/36")
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
-            x=alt.X('DDR_final', title='DDR Final'),
-            y=alt.Y('DDR_per36', title='DDR/36'),
-            color=alt.Color('Nom', title='Team'),
-            tooltip=['Prénom','Nom','MIN','DDR_final','DDR_rate','DDR_per36']
+            x=alt.X('DDR', title='DDR'),
+            y=alt.Y('DDR/36', title='DDR/36'),
+            color=alt.Color('Nom', title='Joueur'),
+            tooltip=['Prénom','Nom','MIN','DDR','DDR%','DDR/36']
         ).interactive()
         st.altair_chart(chart, use_container_width=True)
