@@ -30,13 +30,24 @@ def fetch_league_leaders(season="2024-25"):
 @st.cache_data
 def fetch_opp_excel(path="opp_pts_poss.xlsx"):
     df_opp = pd.read_excel(path)
+
+    # Nettoyage des noms de colonnes
     df_opp.columns = df_opp.columns.str.strip().str.upper()
 
+    # Harmonisation des noms
+    df_opp = df_opp.rename(columns={
+        'OPP_PTS_POSS': 'OPPPTSPOSS',
+        'DEFLECTIONS': 'DEFLECTIONS',
+        'FOUL%': 'PF%',
+        'STL%': 'STL%',
+        'BLK%': 'BLK%'
+    })
+
+    # Vérifie que toutes les colonnes nécessaires sont là
     required = ['PLAYER','OPPPTSPOSS','STL%','BLK%','PF%','DEFLECTIONS']
     missing = [c for c in required if c not in df_opp.columns]
     if missing:
         st.error(f"Colonnes manquantes dans Excel: {missing}. Colonnes trouvées: {df_opp.columns.tolist()}")
-        # Ajoute colonnes manquantes vides
         for c in missing:
             df_opp[c] = 0.0
         if 'PLAYER' not in df_opp.columns:
@@ -87,14 +98,9 @@ def compute_ddr(df_indiv, df_opp, alpha=0.5):
     df['Prénom'] = df['PLAYER'].str.split().str[0]
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ')
 
-    # Colonnes finales
-    cols = [
-        'Prénom','Nom','TEAM','GP','MIN',
-        'STL','BLK','PF','STL36','BLK36','PF36',
-        'STL%','BLK%','PF%','DEFLECTIONS',
-        'DDR_rate','DDR_per36','OppFactor','DDR_blend','DDR_final'
-    ]
-    return df[cols].sort_values('DDR_final', ascending=False)
+    # Colonnes finales réduites
+    df_final = df[['Prénom','Nom','MIN','DDR_rate','DDR_per36','DDR_final']]
+    return df_final.sort_values('DDR_final', ascending=False)
 
 # -----------------------------
 # Interface Streamlit
@@ -133,7 +139,7 @@ if st.button("Générer DDR"):
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
             x=alt.X('DDR_final', title='DDR Final'),
             y=alt.Y('DDR_rate', title='DDR (taux)'),
-            color=alt.Color('TEAM', title='Équipe'),
-            tooltip=['Prénom','Nom','TEAM','MIN','DDR_final','DDR_rate','DDR_per36','OppFactor']
+            color=alt.Color('Nom', title='Joueur'),
+            tooltip=['Prénom','Nom','MIN','DDR_final','DDR_rate','DDR_per36']
         ).interactive()
         st.altair_chart(chart, use_container_width=True)
