@@ -137,6 +137,12 @@ min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 50)
 selected_team = st.text_input("Équipe (laisser vide pour toutes)", value="")
 alpha_ui = st.slider("Mix taux vs volume (alpha)", 0.0, 1.0, 0.5, 0.05)
 
+@st.cache_data
+def fetch_league_leaders(season="2024-25"):
+    ll = leagueleaders.LeagueLeaders(season=season, season_type_all_star="Regular Season")
+    df = ll.get_data_frames()[0]
+    return df[['PLAYER','TEAM','GP','MIN','STL','BLK','PF']].copy()
+
 if st.button("Générer DDR"):
     with st.spinner("Chargement des données..."):
         df_indiv = fetch_league_leaders(season)
@@ -160,11 +166,11 @@ if st.button("Générer DDR"):
             "text/csv"
         )
 
-        st.subheader("Scatter : DDR_final vs DDR_rate")
+        st.subheader("Scatter : DDR_final vs DDR_per36")
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
             x=alt.X('DDR_final', title='DDR Final'),
-            y=alt.Y('DDR_rate', title='DDR (taux)'),
-            color=alt.Color('Nom', title='Joueur'),
+            y=alt.Y('DDR_per36', title='DDR (taux)'),
+            color=alt.Color('Nom', title='Team'),
             tooltip=['Prénom','Nom','MIN','DDR_final','DDR_rate','DDR_per36']
         ).interactive()
         st.altair_chart(chart, use_container_width=True)
