@@ -52,7 +52,7 @@ st.markdown(
     }
     h1 {
         text-align: center;
-        color: white;
+        color: red;
         font-size: 50px;
     }
     .stButton button {
