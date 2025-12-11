@@ -70,7 +70,7 @@ def compute_ddr(df_indiv, df_opp):
         W_BLOCK * df['BLK%'] +
         W_FOUL  * df['PF%']
     )
-    df['DDR-E'] = df['DDR-E'] * 100
+    df['DDR-E'] = df['DDR-E'] * 1000
 
     # Volume positif et négatif pondérés
     df['VolPos'] = (
@@ -94,7 +94,7 @@ def compute_ddr(df_indiv, df_opp):
     df['Prénom'] = df['PLAYER'].str.split().str[0].str.capitalize()
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ').str.capitalize()
 
-     # Ajout des colonnes de classement
+    # Ajout des colonnes de classement
     df['Rank DDR-E'] = df['DDR-E'].rank(ascending=False, method='min').astype(int)
     df['Rank DDR'] = df['DDR'].rank(ascending=False, method='min').astype(int)
 
@@ -102,14 +102,10 @@ def compute_ddr(df_indiv, df_opp):
     df_final = df[['Prénom','Nom','TEAM','MIN','DDR-E','Rank DDR-E','DDR','Rank DDR']]
     return df_final.sort_values('DDR', ascending=False)
 
-    # ⚠️ Inclure TEAM dans le df_final
-    df_final = df[['Prénom','Nom','TEAM','MIN','DDR-E','DDR']]
-    return df_final.sort_values('DDR', ascending=False)
-
 # -----------------------------
 # Interface Streamlit
 # -----------------------------
-st.title("Defensive Disruption Rate (DDR) by Pano — Double Contexte")
+st.title("Defensive Disruption Rate (DDR) by Pano — Double Contexte + Rangs")
 
 season = st.text_input("Saison NBA API (ex: 2024-25)", value="2024-25")
 min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 50)
@@ -133,7 +129,7 @@ if st.button("Générer DDR"):
             df_ddr = df_ddr[df_ddr['TEAM'] == selected_team]
         df_ddr = df_ddr[df_ddr['MIN'] >= min_threshold]
 
-        st.subheader("Classement DDR unifié (double contexte)")
+        st.subheader("Classement DDR unifié (double contexte + rangs)")
         st.dataframe(
             df_ddr,
             column_config={
@@ -150,6 +146,16 @@ if st.button("Générer DDR"):
                     format="%.1f",
                     min_value=df_ddr["DDR-E"].min(),
                     max_value=df_ddr["DDR-E"].max()
+                ),
+                "Rank DDR": st.column_config.NumberColumn(
+                    "Rank DDR",
+                    help="Classement par DDR final",
+                    format="%d"
+                ),
+                "Rank DDR-E": st.column_config.NumberColumn(
+                    "Rank DDR-E",
+                    help="Classement par efficacité pondérée DDR-E",
+                    format="%d"
                 )
             }
         )
@@ -157,7 +163,7 @@ if st.button("Générer DDR"):
         st.download_button(
             "Télécharger le classement complet",
             df_ddr.to_csv(index=False).encode('utf-8'),
-            "DDR_double_contexte.csv",
+            "DDR_double_contexte_rangs.csv",
             "text/csv"
         )
 
@@ -166,7 +172,7 @@ if st.button("Générer DDR"):
             x=alt.X('DDR', title='DDR (VolPos/VolNeg × ContextE × ContextTeam)'),
             y=alt.Y('DDR-E', title='DDR-E (efficacité pondérée)'),
             color=alt.Color('Nom', title='Joueur'),
-            tooltip=['Prénom','Nom','TEAM','MIN','DDR','DDR-E']
+            tooltip=['Prénom','Nom','TEAM','MIN','DDR','Rank DDR','DDR-E','Rank DDR-E']
         ).interactive()
         st.altair_chart(chart, use_container_width=True)
 
@@ -180,5 +186,3 @@ if st.button("Générer DDR"):
             height=400
         )
         st.altair_chart(hist, use_container_width=True)
-
-
