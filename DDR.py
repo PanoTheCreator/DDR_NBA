@@ -89,7 +89,7 @@ def compute_ddr(df_indiv, df_opp):
     # DDR final (compressé et normalisé)
     df['DDR'] = np.where(
         df['VolNeg'] != 0,
-        (np.sqrt(df['VolPos'] / df['VolNeg']) * df['ContextE'] * df['ContextTeam']) * 3,
+        (np.sqrt(df['VolPos'] / df['VolNeg']) * df['ContextE'] * df['ContextTeam']) * 2,
         np.nan
     )
 
