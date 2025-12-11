@@ -82,10 +82,10 @@ def compute_ddr(df_indiv, df_opp):
 
     # Contexte collectif enrichi (4 facteurs)
     df['ContextTeam'] = (
-        (1 - df['OPP_EFG%']) * 1.2 +
-        df['OPP_TOV%'] * 1.5 +
-        (1 - df['OPP_ORB%']) * 1.0 +
-        (1 - df['OPP_FTR']) * 1.3
+        (1 - df['OPP_EFG%']) * 1.1 +
+        df['OPP_TOV%'] * 1.3 +
+        (1 - df['OPP_ORB%']) * 1.1 +
+        (1 - df['OPP_FTR']) * 1.2
     )
 
     # DDR final
