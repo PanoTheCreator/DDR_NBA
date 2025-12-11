@@ -9,8 +9,8 @@ import altair as alt
 # -----------------------------
 W_STEAL = 1.4
 W_BLOCK = 1.2
-W_FOUL = -1.5
-W_DEFLECTION = 1.1
+W_FOUL = -1.6
+W_DEFLECTION = 1.0
 
 # -----------------------------
 # Chargement OppPtsPoss + % + deflections depuis Excel
@@ -71,7 +71,7 @@ def compute_ddr(df_indiv, df_opp):
         W_STEAL * df['STL%'] +
         W_BLOCK * df['BLK%'] +
         W_FOUL  * df['PF%']
-    ) * 1000
+    ) * 100
 
     # Volumes
     df['VolPos'] = W_STEAL * df['STL'] + W_BLOCK * df['BLK'] + W_DEFLECTION * df['DEFLECTIONS']
