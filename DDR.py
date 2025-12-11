@@ -196,4 +196,6 @@ if st.button("Générer DDR"):
             x=alt.X('DDR', title='DDR (VolPos/VolNeg × ContextE × ContextTeam)'),
             y=alt.Y('DDR-E', title='DDR-E (efficacité pondérée)'),
             color=alt.Color('Nom', title='Joueur'),
-            tooltip=['Prénom','Nom','
+               tooltip=['Prénom','Nom','TEAM','MIN','DDR','Rank DDR','DDR-E','Rank DDR-E']
+).interactive()
+st.altair_chart(chart, use_container_width=True)
