@@ -71,7 +71,7 @@ def compute_ddr(df_indiv, df_opp):
         W_STEAL * df['STL%'] +
         W_BLOCK * df['BLK%'] +
         W_FOUL  * df['PF%']
-    ) * 100
+    ) * 1000
 
     # Volumes
     df['VolPos'] = W_STEAL * df['STL'] + W_BLOCK * df['BLK'] + W_DEFLECTION * df['DEFLECTIONS']
