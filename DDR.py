@@ -27,6 +27,7 @@ def fetch_opp_excel(path="opp_pts_poss24_25.xlsx"):
         'BLK%': 'BLK%'
     })
 
+    # Conversion en numérique
     for col in ['STL%','BLK%','PF%','DEFLECTIONS','OPPPTSPOSS']:
         if col in df_opp.columns:
             df_opp[col] = (
@@ -37,24 +38,26 @@ def fetch_opp_excel(path="opp_pts_poss24_25.xlsx"):
             )
             df_opp[col] = pd.to_numeric(df_opp[col], errors='coerce')
 
+    # Convertir % en décimales
     for col in ['STL%','BLK%','PF%']:
         if col in df_opp.columns:
             df_opp[col] = df_opp[col] / 100.0
 
-    required = ['PLAYER','OPPPTSPOSS','STL%','BLK%','PF%','DEFLECTIONS']
-    missing = [c for c in required if c not in df_opp.columns]
-    if missing:
-        st.error(f"Colonnes manquantes dans Excel: {missing}. Colonnes trouvées: {df_opp.columns.tolist()}")
-        for c in missing:
-            df_opp[c] = 0.0
-        if 'PLAYER' not in df_opp.columns:
-            df_opp['PLAYER'] = ""
+    # Harmonisation des noms pour éviter les doublons
+    df_opp['PLAYER'] = df_opp['PLAYER'].str.strip().str.upper()
+
+    # Suppression des doublons (on garde la première occurrence)
+    df_opp = df_opp.drop_duplicates(subset='PLAYER', keep='first')
+
     return df_opp
 
 # -----------------------------
 # Calcul DDR unifié
 # -----------------------------
 def compute_ddr(df_indiv, df_opp):
+    # Harmonisation des noms côté NBA API
+    df_indiv['PLAYER'] = df_indiv['PLAYER'].str.strip().str.upper()
+
     df = pd.merge(df_indiv, df_opp, on='PLAYER', how='left')
 
     for col in ['STL','BLK','PF','MIN','GP','OPPPTSPOSS','STL%','BLK%','PF%','DEFLECTIONS']:
@@ -67,7 +70,7 @@ def compute_ddr(df_indiv, df_opp):
         W_BLOCK * df['BLK%'] +
         W_FOUL  * df['PF%']
     )
-    df['DDR-E'] = df['DDR-E'] * 1000
+    df['DDR-E'] = df['DDR-E'] * 100
 
     # Volume positif et négatif pondérés
     df['VolPos'] = (
@@ -88,10 +91,11 @@ def compute_ddr(df_indiv, df_opp):
                          (df['VolPos'] / df['VolNeg']) * df['ContextE'] * df['ContextTeam'],
                          np.nan)
 
-    df['Prénom'] = df['PLAYER'].str.split().str[0]
-    df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ')
+    df['Prénom'] = df['PLAYER'].str.split().str[0].str.capitalize()
+    df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ').str.capitalize()
 
-    df_final = df[['Prénom','Nom','MIN','DDR-E','DDR']]
+    # ⚠️ Inclure TEAM dans le df_final
+    df_final = df[['Prénom','Nom','TEAM','MIN','DDR-E','DDR']]
     return df_final.sort_values('DDR', ascending=False)
 
 # -----------------------------
@@ -116,7 +120,8 @@ if st.button("Générer DDR"):
 
         df_ddr = compute_ddr(df_indiv, df_opp)
 
-        if selected_team.strip():
+        # Filtre par équipe sécurisé
+        if 'TEAM' in df_ddr.columns and selected_team.strip():
             df_ddr = df_ddr[df_ddr['TEAM'] == selected_team]
         df_ddr = df_ddr[df_ddr['MIN'] >= min_threshold]
 
@@ -153,7 +158,7 @@ if st.button("Générer DDR"):
             x=alt.X('DDR', title='DDR (VolPos/VolNeg × ContextE × ContextTeam)'),
             y=alt.Y('DDR-E', title='DDR-E (efficacité pondérée)'),
             color=alt.Color('Nom', title='Joueur'),
-            tooltip=['Prénom','Nom','MIN','DDR','DDR-E']
+            tooltip=['Prénom','Nom','TEAM','MIN','DDR','DDR-E']
         ).interactive()
         st.altair_chart(chart, use_container_width=True)
 
