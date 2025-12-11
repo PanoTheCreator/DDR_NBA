@@ -110,6 +110,22 @@ def compute_ddr(df_indiv, df_opp):
 # -----------------------------
 st.title("Defensive Disruption Rate (DDR) by Pano — Double Contexte + Rangs")
 
+# 🔎 Encadré explicatif
+st.markdown("""
+## 🧾 Comprendre le DDR et le DDR‑E
+
+| Statistique | Formule | Ce que ça mesure | Interprétation |
+|-------------|---------|------------------|----------------|
+| **DDR‑E** (Efficiency) | (1.8 × STL% + 1.4 × BLK% – 1.5 × PF%) × 1000 | Efficacité défensive pondérée par possession | Score individuel : qualité des actions défensives vs fautes |
+| **DDR** (Final) | (VolPos / VolNeg) × ContextE × ContextTeam | Rapport volume positif/négatif corrigé par double contexte | Score global : valorise les profils propres et actifs |
+
+### 🔍 Lecture rapide
+- **DDR‑E élevé + DDR élevé** → défenseur efficace et propre (profil élite).  
+- **DDR‑E élevé + DDR faible** → défenseur efficace mais trop de fautes (profil agressif).  
+- **DDR‑E faible + DDR élevé** → joueur actif qui perturbe sans être élite (profil opportuniste).  
+- **DDR‑E faible + DDR faible** → défenseur peu impactant et pénalisant (profil fragile).
+""")
+
 season = st.text_input("Saison NBA API (ex: 2024-25)", value="2024-25")
 min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 50)
 selected_team = st.text_input("Équipe (laisser vide pour toutes)", value="")
@@ -173,19 +189,4 @@ if st.button("Générer DDR"):
         st.subheader("Scatter : DDR vs DDR-E")
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
             x=alt.X('DDR', title='DDR (VolPos/VolNeg × ContextE × ContextTeam)'),
-            y=alt.Y('DDR-E', title='DDR-E (efficacité pondérée)'),
-            color=alt.Color('Nom', title='Joueur'),
-            tooltip=['Prénom','Nom','TEAM','MIN','DDR','Rank DDR','DDR-E','Rank DDR-E']
-        ).interactive()
-        st.altair_chart(chart, use_container_width=True)
-
-        st.subheader("Histogramme de la distribution des DDR")
-        hist = alt.Chart(df_ddr).mark_bar().encode(
-            alt.X("DDR", bin=alt.Bin(maxbins=30), title="DDR"),
-            alt.Y("count()", title="Nombre de joueurs"),
-            tooltip=["count()"]
-        ).properties(
-            width=600,
-            height=400
-        )
-        st.altair_chart(hist, use_container_width=True)
+           
