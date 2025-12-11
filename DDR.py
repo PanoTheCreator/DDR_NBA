@@ -5,12 +5,12 @@ from nba_api.stats.endpoints import leagueleaders
 import altair as alt
 
 # -----------------------------
-# Pondérations
+# Pondérations ajustées
 # -----------------------------
-W_STEAL = 1.4
-W_BLOCK = 1.2
-W_FOUL = -1.6
-W_DEFLECTION = 1.0
+W_STEAL = 1.0
+W_BLOCK = 0.8
+W_FOUL = -1.2
+W_DEFLECTION = 0.5
 
 # -----------------------------
 # Chargement OppPtsPoss + % + deflections depuis Excel
@@ -45,12 +45,10 @@ def fetch_opp_excel(path):
     # Convertir % en décimales
     for col in ['STL%','BLK%','PF%','OPP_EFG%','OPP_TOV%','OPP_ORB%','OPP_FTR']:
         if col in df_opp.columns:
-            df_opp[col] = df_opp[col] / 1000
+            df_opp[col] = df_opp[col] / 100.0
 
-    # Harmonisation des noms pour éviter les doublons
+    # Harmonisation des noms
     df_opp['PLAYER'] = df_opp['PLAYER'].str.strip().str.upper()
-
-    # Suppression des doublons
     df_opp = df_opp.drop_duplicates(subset='PLAYER', keep='first')
 
     return df_opp
@@ -66,12 +64,12 @@ def compute_ddr(df_indiv, df_opp):
         if col in df.columns:
             df[col] = df[col].fillna(0.0)
 
-    # DDR-E (efficacité pondérée)
+    # DDR-E (efficacité pondérée, normalisée)
     df['DDR-E'] = (
         W_STEAL * df['STL%'] +
         W_BLOCK * df['BLK%'] +
         W_FOUL  * df['PF%']
-    ) * 1000
+    ) * 10  # normalisation
 
     # Volumes
     df['VolPos'] = W_STEAL * df['STL'] + W_BLOCK * df['BLK'] + W_DEFLECTION * df['DEFLECTIONS']
@@ -80,7 +78,7 @@ def compute_ddr(df_indiv, df_opp):
     # Contexte individuel
     df['ContextE'] = np.where(df['DDR-E'] > 0, 1.1, 0.9)
 
-    # Contexte collectif enrichi (4 facteurs)
+    # Contexte collectif enrichi
     df['ContextTeam'] = (
         (1 - df['OPP_EFG%']) * 1.1 +
         df['OPP_TOV%'] * 1.3 +
@@ -88,10 +86,12 @@ def compute_ddr(df_indiv, df_opp):
         (1 - df['OPP_FTR']) * 1.2
     )
 
-    # DDR final
-    df['DDR'] = np.where(df['VolNeg'] != 0,
-                         (df['VolPos'] / df['VolNeg']) * df['ContextE'] * df['ContextTeam'],
-                         np.nan)
+    # DDR final (normalisé)
+    df['DDR'] = np.where(
+        df['VolNeg'] != 0,
+        ((df['VolPos'] / df['VolNeg']) * df['ContextE'] * df['ContextTeam']) * 3,
+        np.nan
+    )
 
     df['Prénom'] = df['PLAYER'].str.split().str[0].str.capitalize()
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ').str.capitalize()
@@ -112,18 +112,14 @@ st.info("""
 - **DDR‑E (Efficiency)** : efficacité individuelle pondérée par possession.  
 - **DDR (Final)** : rapport VolPos/VolNeg corrigé par double contexte (individuel + collectif).  
 
-Lecture rapide :  
-- DDR‑E ↑ + DDR ↑ → défenseur élite et propre.  
-- DDR‑E ↑ + DDR ↓ → efficace mais trop de fautes.  
-- DDR‑E ↓ + DDR ↑ → actif/opportuniste.  
-- DDR‑E ↓ + DDR ↓ → profil fragile.
+Échelle cible : environ -3 à +10 pour les deux scores.
 """)
 
 # Menu déroulant pour choisir la saison
 season = st.selectbox(
     "Choisir la saison NBA",
     options=["2024-25", "2025-26"],
-    index=1  # par défaut sur 2025-26
+    index=1
 )
 
 min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 50)
@@ -139,7 +135,6 @@ if st.button("Générer DDR"):
     with st.spinner("Chargement des données..."):
         df_indiv = fetch_league_leaders(season)
 
-        # Choix du fichier Excel selon saison
         if season == "2025-26":
             df_opp = fetch_opp_excel("opp_pts_poss25-26.xlsx")
         else:
