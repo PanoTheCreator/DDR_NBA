@@ -9,7 +9,7 @@ import altair as alt
 # -----------------------------
 W_STEAL = 1.4
 W_BLOCK = 1.2
-W_FOUL = -1.8
+W_FOUL = -1.6
 W_DEFLECTION = 1.0
 
 # -----------------------------
