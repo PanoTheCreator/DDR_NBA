@@ -45,7 +45,7 @@ def fetch_opp_excel(path):
     # Convertir % en décimales
     for col in ['STL%','BLK%','PF%','OPP_EFG%','OPP_TOV%','OPP_ORB%','OPP_FTR']:
         if col in df_opp.columns:
-            df_opp[col] = df_opp[col] / 10.0
+            df_opp[col] = df_opp[col] / 1000
 
     # Harmonisation des noms pour éviter les doublons
     df_opp['PLAYER'] = df_opp['PLAYER'].str.strip().str.upper()
