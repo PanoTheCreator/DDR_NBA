@@ -110,20 +110,25 @@ def compute_ddr(df_indiv, df_opp):
 # -----------------------------
 st.title("Defensive Disruption Rate (DDR) by Pano — Double Contexte + Rangs")
 
-# 🔎 Encadré explicatif
-st.markdown("""
-## 🧾 Comprendre le DDR et le DDR‑E
+# Encadré explicatif coloré
+st.info("""
+🧾 **Comprendre le DDR et le DDR‑E**
 
-| Statistique | Formule | Ce que ça mesure | Interprétation |
-|-------------|---------|------------------|----------------|
-| **DDR‑E** (Efficiency) | (1.8 × STL% + 1.4 × BLK% – 1.5 × PF%) × 1000 | Efficacité défensive pondérée par possession | Score individuel : qualité des actions défensives vs fautes |
-| **DDR** (Final) | (VolPos / VolNeg) × ContextE × ContextTeam | Rapport volume positif/négatif corrigé par double contexte | Score global : valorise les profils propres et actifs |
+- **DDR‑E (Efficiency)**  
+  Formule : (1.8 × STL% + 1.4 × BLK% – 1.5 × PF%) × 1000  
+  → Mesure l’efficacité défensive pondérée par possession.  
+  → Score individuel : qualité des actions défensives vs fautes.  
 
-### 🔍 Lecture rapide
-- **DDR‑E élevé + DDR élevé** → défenseur efficace et propre (profil élite).  
-- **DDR‑E élevé + DDR faible** → défenseur efficace mais trop de fautes (profil agressif).  
-- **DDR‑E faible + DDR élevé** → joueur actif qui perturbe sans être élite (profil opportuniste).  
-- **DDR‑E faible + DDR faible** → défenseur peu impactant et pénalisant (profil fragile).
+- **DDR (Final)**  
+  Formule : (VolPos / VolNeg) × ContextE × ContextTeam  
+  → Mesure le rapport volume positif/négatif corrigé par double contexte.  
+  → Score global : valorise les profils **propres et actifs**.  
+
+**Lecture rapide :**  
+- DDR‑E ↑ + DDR ↑ → défenseur efficace et propre (profil élite).  
+- DDR‑E ↑ + DDR ↓ → défenseur efficace mais trop de fautes (profil agressif).  
+- DDR‑E ↓ + DDR ↑ → joueur actif qui perturbe sans être élite (profil opportuniste).  
+- DDR‑E ↓ + DDR ↓ → défenseur peu impactant et pénalisant (profil fragile).
 """)
 
 season = st.text_input("Saison NBA API (ex: 2024-25)", value="2024-25")
@@ -189,4 +194,6 @@ if st.button("Générer DDR"):
         st.subheader("Scatter : DDR vs DDR-E")
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
             x=alt.X('DDR', title='DDR (VolPos/VolNeg × ContextE × ContextTeam)'),
-           
+            y=alt.Y('DDR-E', title='DDR-E (efficacité pondérée)'),
+            color=alt.Color('Nom', title='Joueur'),
+            tooltip=['Prénom','Nom','
