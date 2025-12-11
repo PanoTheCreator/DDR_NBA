@@ -70,7 +70,7 @@ def compute_ddr(df_indiv, df_opp):
         W_BLOCK * df['BLK%'] +
         W_FOUL  * df['PF%']
     )
-    df['DDR-E'] = df['DDR-E'] * 1000
+    df['DDR-E'] = df['DDR-E'] * 100
 
     # Volume positif et négatif pondérés
     df['VolPos'] = (
