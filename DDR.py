@@ -45,7 +45,7 @@ def fetch_opp_excel(path):
     # Convertir % en décimales
     for col in ['STL%','BLK%','PF%','OPP_EFG%','OPP_TOV%','OPP_ORB%','OPP_FTR']:
         if col in df_opp.columns:
-            df_opp[col] = df_opp[col] / 100.0
+            df_opp[col] = df_opp[col] / 10.0
 
     # Harmonisation des noms pour éviter les doublons
     df_opp['PLAYER'] = df_opp['PLAYER'].str.strip().str.upper()
@@ -110,8 +110,7 @@ st.info("""
 🧾 **DDR enrichi avec les 4 facteurs défensifs**
 
 - **DDR‑E (Efficiency)** : efficacité individuelle pondérée par possession.  
-- **DDR (Final)** : rapport VolPos/VolNeg corrigé par double contexte (individuel + collectif).  
-- **Contexte collectif enrichi** : basé sur opp_eFG%, opp_TOV%, opp_ORB%, opp_FT Rate.  
+- **DDR (Final)** : rapport VolPos/VolNeg corrigé par double contexte (individuel + collectif).   
 
 Lecture rapide :  
 - DDR‑E ↑ + DDR ↑ → défenseur élite et propre.  
