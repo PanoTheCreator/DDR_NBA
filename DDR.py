@@ -114,7 +114,7 @@ st.title("Defensive Disruption Rate (DDR) -- Powered by Pano")
 st.info("""
 🧾 **Comprendre le DDR et le DDR‑E**
 
-- **DDR‑E (Efficiency)**   
+- **DDR‑E (Efficiency)**  
   → Mesure l’efficacité défensive pondérée par possession.  
   → Score purement individuel : le DDR-E met en lumière la qualité des actions défensives.  
 
@@ -189,14 +189,10 @@ if st.button("Générer DDR"):
             "text/csv"
         )
 
-st.subheader("Scatter : DDR vs DDR-E")
-chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
-    x=alt.X('DDR', title='DDR (VolPos/VolNeg × ContextE × ContextTeam)'),
-    y=alt.Y('DDR-E', title='DDR-E (efficacité pondérée)'),
-    color=alt.Color('Nom', title='Joueur'),
-    tooltip=['Prénom','Nom','TEAM','MIN','DDR','Rank DDR','DDR-E','Rank DDR-E']
-).interactive()
-
-st.altair_chart(chart, use_container_width=True)
-
-
+        # Scatter plot placé DANS le bloc pour éviter NameError
+        st.subheader("Scatter : DDR vs DDR-E")
+        chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
+            x=alt.X('DDR', title='DDR (VolPos/VolNeg × ContextE × ContextTeam)'),
+            y=alt.Y('DDR-E', title='DDR-E (efficacité pondérée)'),
+            color=alt.Color('Nom', title='Joueur'),
+            tooltip=['Prénom','Nom','TEAM','MIN','DDR','
