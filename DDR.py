@@ -189,10 +189,12 @@ if st.button("Générer DDR"):
             "text/csv"
         )
 
-        # Scatter plot placé DANS le bloc pour éviter NameError
+        # Scatter plot
         st.subheader("Scatter : DDR vs DDR-E")
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
             x=alt.X('DDR', title='DDR (VolPos/VolNeg × ContextE × ContextTeam)'),
             y=alt.Y('DDR-E', title='DDR-E (efficacité pondérée)'),
             color=alt.Color('Nom', title='Joueur'),
-            tooltip=['Prénom','Nom','TEAM','MIN','DDR','
+            tooltip=['Prénom','Nom','TEAM','MIN','DDR','Rank DDR','DDR-E','Rank DDR-E']
+        ).interactive()
+        st.altair_chart(chart, use_container_width=True
