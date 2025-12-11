@@ -45,7 +45,7 @@ def fetch_opp_excel(path):
     # Convertir % en décimales
     for col in ['STL%','BLK%','PF%','OPP_EFG%','OPP_TOV%','OPP_ORB%','OPP_FTR']:
         if col in df_opp.columns:
-            df_opp[col] = df_opp[col] / 1000
+            df_opp[col] = df_opp[col] / 100.0
 
     # Harmonisation des noms pour éviter les doublons
     df_opp['PLAYER'] = df_opp['PLAYER'].str.strip().str.upper()
@@ -104,13 +104,13 @@ def compute_ddr(df_indiv, df_opp):
 # -----------------------------
 # Interface Streamlit
 # -----------------------------
-st.title("Defensive Disruption Rate (DDR) -- Saison 2025-26 enrichie")
+st.title("Defensive Disruption Rate (DDR) -- Saison sélectionnable")
 
 st.info("""
 🧾 **DDR enrichi avec les 4 facteurs défensifs**
 
 - **DDR‑E (Efficiency)** : efficacité individuelle pondérée par possession.  
-- **DDR (Final)** : rapport VolPos/VolNeg corrigé par double contexte (individuel + collectif).   
+- **DDR (Final)** : rapport VolPos/VolNeg corrigé par double contexte (individuel + collectif).  
 
 Lecture rapide :  
 - DDR‑E ↑ + DDR ↑ → défenseur élite et propre.  
@@ -119,7 +119,13 @@ Lecture rapide :
 - DDR‑E ↓ + DDR ↓ → profil fragile.
 """)
 
-season = st.text_input("Saison NBA API", value="2025-26")
+# Menu déroulant pour choisir la saison
+season = st.selectbox(
+    "Choisir la saison NBA",
+    options=["2024-25", "2025-26"],
+    index=1  # par défaut sur 2025-26
+)
+
 min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 50)
 selected_team = st.text_input("Équipe (laisser vide pour toutes)", value="")
 
@@ -145,13 +151,13 @@ if st.button("Générer DDR"):
             df_ddr = df_ddr[df_ddr['TEAM'] == selected_team]
         df_ddr = df_ddr[df_ddr['MIN'] >= min_threshold]
 
-        st.subheader("Classement DDR enrichi (25-26)")
+        st.subheader(f"Classement DDR enrichi ({season})")
         st.dataframe(df_ddr)
 
         st.download_button(
-            "Télécharger le classement complet",
+            f"Télécharger le classement complet ({season})",
             df_ddr.to_csv(index=False).encode('utf-8'),
-            "DDR_25-26.csv",
+            f"DDR_{season}.csv",
             "text/csv"
         )
 
