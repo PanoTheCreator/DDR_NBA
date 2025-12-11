@@ -69,7 +69,7 @@ def compute_ddr(df_indiv, df_opp):
         W_STEAL * df['STL%'] +
         W_BLOCK * df['BLK%'] +
         W_FOUL  * df['PF%']
-    ) * 10  # normalisation
+    ) * 120  # facteur d’échelle pour atteindre ~ -3 à +10
 
     # Volumes
     df['VolPos'] = W_STEAL * df['STL'] + W_BLOCK * df['BLK'] + W_DEFLECTION * df['DEFLECTIONS']
@@ -86,10 +86,10 @@ def compute_ddr(df_indiv, df_opp):
         (1 - df['OPP_FTR']) * 1.2
     )
 
-    # DDR final (normalisé)
+    # DDR final (compressé et normalisé)
     df['DDR'] = np.where(
         df['VolNeg'] != 0,
-        ((df['VolPos'] / df['VolNeg']) * df['ContextE'] * df['ContextTeam']) * 3,
+        (np.sqrt(df['VolPos'] / df['VolNeg']) * df['ContextE'] * df['ContextTeam']) * 3,
         np.nan
     )
 
