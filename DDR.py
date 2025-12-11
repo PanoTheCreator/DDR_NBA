@@ -7,8 +7,8 @@ import altair as alt
 # -----------------------------
 # Pondérations ajustées
 # -----------------------------
-W_STEAL = 1.0
-W_BLOCK = 0.8
+W_STEAL = 1.2
+W_BLOCK = 1.0
 W_FOUL = -1.2
 W_DEFLECTION = 0.5
 
