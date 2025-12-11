@@ -94,9 +94,12 @@ def compute_ddr(df_indiv, df_opp):
     df['Prénom'] = df['PLAYER'].str.split().str[0].str.capitalize()
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ').str.capitalize()
 
-    # Ajout des colonnes de classement
-    df['Rank DDR-E'] = df['DDR-E'].rank(ascending=False, method='min').astype(int)
-    df['Rank DDR'] = df['DDR'].rank(ascending=False, method='min').astype(int)
+    # Ajout des colonnes de classement avec gestion des NaN
+    df['Rank DDR-E'] = df['DDR-E'].rank(ascending=False, method='min')
+    df['Rank DDR-E'] = df['Rank DDR-E'].fillna(0).astype(int)
+
+    df['Rank DDR'] = df['DDR'].rank(ascending=False, method='min')
+    df['Rank DDR'] = df['Rank DDR'].fillna(0).astype(int)
 
     # Inclure TEAM + ranks
     df_final = df[['Prénom','Nom','TEAM','MIN','DDR-E','Rank DDR-E','DDR','Rank DDR']]
