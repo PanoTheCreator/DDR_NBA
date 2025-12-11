@@ -108,19 +108,17 @@ def compute_ddr(df_indiv, df_opp):
 # -----------------------------
 # Interface Streamlit
 # -----------------------------
-st.title("Defensive Disruption Rate (DDR) by Pano — Double Contexte + Rangs")
+st.title("Defensive Disruption Rate (DDR) -- Powered by Pano")
 
 # Encadré explicatif coloré
 st.info("""
 🧾 **Comprendre le DDR et le DDR‑E**
 
-- **DDR‑E (Efficiency)**  
-  Formule : (1.8 × STL% + 1.4 × BLK% – 1.5 × PF%) × 1000  
+- **DDR‑E (Efficiency)**   
   → Mesure l’efficacité défensive pondérée par possession.  
-  → Score individuel : qualité des actions défensives vs fautes.  
+  → Score purement individuel : le DDR-E met en lumière la qualité des actions défensives.  
 
 - **DDR (Final)**  
-  Formule : (VolPos / VolNeg) × ContextE × ContextTeam  
   → Mesure le rapport volume positif/négatif corrigé par double contexte.  
   → Score global : valorise les profils **propres et actifs**.  
 
@@ -191,11 +189,12 @@ if st.button("Générer DDR"):
             "text/csv"
         )
 
-        st.subheader("Scatter : DDR vs DDR-E")
-        chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
-            x=alt.X('DDR', title='DDR (VolPos/VolNeg × ContextE × ContextTeam)'),
-            y=alt.Y('DDR-E', title='DDR-E (efficacité pondérée)'),
-            color=alt.Color('Nom', title='Joueur'),
-               tooltip=['Prénom','Nom','TEAM','MIN','DDR','Rank DDR','DDR-E','Rank DDR-E']
+st.subheader("Scatter : DDR vs DDR-E")
+chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
+    x=alt.X('DDR', title='DDR (VolPos/VolNeg × ContextE × ContextTeam)'),
+    y=alt.Y('DDR-E', title='DDR-E (efficacité pondérée)'),
+    color=alt.Color('Nom', title='Joueur'),
+    tooltip=['Prénom','Nom','TEAM','MIN','DDR','Rank DDR','DDR-E','Rank DDR-E']
 ).interactive()
+
 st.altair_chart(chart, use_container_width=True)
