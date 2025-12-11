@@ -45,7 +45,7 @@ def fetch_opp_excel(path):
     # Convertir % en décimales
     for col in ['STL%','BLK%','PF%','OPP_EFG%','OPP_TOV%','OPP_ORB%','OPP_FTR']:
         if col in df_opp.columns:
-            df_opp[col] = df_opp[col] / 70.0
+            df_opp[col] = df_opp[col] / 50.0
 
     # Harmonisation des noms
     df_opp['PLAYER'] = df_opp['PLAYER'].str.strip().str.upper()
@@ -69,7 +69,7 @@ def compute_ddr(df_indiv, df_opp):
         W_STEAL * df['STL%'] +
         W_BLOCK * df['BLK%'] +
         W_FOUL  * df['PF%']
-    ) * 120  # facteur d’échelle pour atteindre ~ -3 à +10
+    ) * 150  # facteur d’échelle pour atteindre ~ -3 à +10
 
     # Volumes
     df['VolPos'] = W_STEAL * df['STL'] + W_BLOCK * df['BLK'] + W_DEFLECTION * df['DEFLECTIONS']
