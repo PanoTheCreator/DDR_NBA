@@ -101,7 +101,7 @@ def compute_ddr(df_indiv, df_opp):
     core_norm = (df['core'] - core_med) / (core_iqr if core_iqr > 0 else 1e-6)
 
     df['DDR'] = (4.0 * core_norm) * df['ContextE'] * df['ContextTeam']
-    df['DDR'] = df['DDR'].clip(-3, 10)
+    df['DDR'] = df['DDR'].
 
     # Présentation
     df['Prénom'] = df['PLAYER'].str.split().str[0].str.capitalize()
