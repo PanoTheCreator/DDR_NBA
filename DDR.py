@@ -95,15 +95,17 @@ def compute_ddr(df_indiv, df_opp):
     team_raw = team_4f - 0.3 * z_opp_ppp
     df['ContextTeam'] = 1.0 + 0.15 * np.tanh(team_raw)
 
-    # Calibration globale
-    core_med = df['core'].median()
-    core_iqr = df['core'].quantile(0.75) - df['core'].quantile(0.25)
-    core_norm = (df['core'] - core_med) / (core_iqr if core_iqr > 0 else 1e-6)
+    # DDR final (brut, sans standardisation ni clipping)
+    df['DDR'] = (df['core']) * df['ContextE'] * df['ContextTeam']
 
     # Présentation
     df['Prénom'] = df['PLAYER'].str.split().str[0].str.capitalize()
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ').str.capitalize()
-    df['Rank DDR'] = df['DDR'].rank(ascending=False, method='min').fillna(0).astype(int)
+
+    if 'DDR' in df.columns:
+        df['Rank DDR'] = df['DDR'].rank(ascending=False, method='min').fillna(0).astype(int)
+    else:
+        df['Rank DDR'] = 0
 
     return df[['Prénom','Nom','TEAM','MIN','DDR','Rank DDR']].sort_values('DDR', ascending=False)
 
@@ -115,7 +117,7 @@ st.title("Defensive Disruption Rate (DDR) — Saison sélectionnable, DDR unique
 st.info("""
 - **DDR unique**: log-ratio VolPos vs VolNeg corrigé par contexte individuel (% STL/BLK/PF) et collectif (4 facteurs + opp pts/poss).
 - **Calibration**: centrage par médiane + échelle IQR, compression par tanh pour lisibilité.
-- Échelle cible: environ -3 à +10.
+- ⚠️ Pas de standardisation ni clipping: tu vois les valeurs brutes.
 """)
 
 season = st.selectbox(
@@ -124,7 +126,6 @@ season = st.selectbox(
     index=1
 )
 
-# ✅ Correction du slider
 min_threshold = st.slider("Minutes minimum", 0, 2000, 500, step=50)
 selected_team = st.text_input("Équipe (laisser vide pour toutes)", value="")
 
