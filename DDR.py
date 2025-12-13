@@ -110,9 +110,9 @@ def compute_ddr(df_indiv, df_opp):
 st.title("Defensive Disruption Rate (DDR) — Saison sélectionnable, DDR unique")
 
 st.info("""
-- **DDR unique**: log-ratio VolPos vs VolNeg corrigé par contexte individuel (% STL/BLK/PF) et collectif (4 facteurs + opp pts/poss).
-- **Calibration**: centrage par médiane + échelle IQR, compression par tanh pour lisibilité.
-- **Échelle cible**: environ -5 à +15.
+- DDR unique: log-ratio VolPos vs VolNeg corrigé par contexte individuel (% STL/BLK/PF) et collectif (4 facteurs + opp pts/poss).
+- Calibration: centrage par médiane + échelle IQR, compression par tanh pour lisibilité.
+- Échelle cible: environ -5 à +15.
 """)
 
 season = st.selectbox(
@@ -170,12 +170,21 @@ if st.button("Générer DDR"):
         st.altair_chart(hist, use_container_width=True)
 
         # -----------------------------
-        # Analyse par équipe
+        # Analyse par équipe (NamedAgg)
         # -----------------------------
         st.subheader("Analyse DDR par équipe")
 
         df_team = df_ddr.groupby("TEAM").agg(
-            Moyenne_DDR=("DDR", "mean"),
-            EcartType_DDR=("DDR", "std"),
-            Joueurs=("DDR", "count")
-        ).reset_index
+            Moyenne_DDR=pd.NamedAgg(column="DDR", aggfunc="mean"),
+            EcartType_DDR=pd.NamedAgg(column="DDR", aggfunc="std"),
+            Joueurs=pd.NamedAgg(column="DDR", aggfunc="count")
+        ).reset_index().sort_values("Moyenne_DDR", ascending=False)
+
+        st.dataframe(df_team)
+
+        chart_team = alt.Chart(df_team).mark_bar().encode(
+            x=alt.X("TEAM", sort="-y", title="Équipe"),
+            y=alt.Y("Moyenne_DDR", title="Moyenne DDR"),
+            tooltip=["TEAM","Moyenne_DDR","EcartType_DDR","Joueurs"]
+        ).properties(width=700, height=400)
+        st.altair_chart(chart_team, use_container_width=True)
