@@ -137,59 +137,60 @@ if 'TEAM' in df_ddr.columns and selected_team.strip():
 df_ddr = df_ddr[df_ddr['MIN'] >= min_threshold]
 
 # -----------------------------
-# 4 Boutons côte à côte
+# Créer 4 colonnes juste pour les boutons
 # -----------------------------
 col1, col2, col3, col4 = st.columns(4)
 
-with col1:
-    if st.button("DDR individuel"):
-        st.subheader(f"Classement DDR individuel ({season})")
-        st.dataframe(df_ddr)
+# Chaque bouton déclenche un flag
+show_indiv = col1.button("DDR individuel")
+show_team = col2.button("DDR collectif")
+show_graph_indiv = col3.button("Graphique individuel")
+show_graph_team = col4.button("Graphique collectif")
 
-with col2:
-    if st.button("DDR collectif"):
-        st.subheader("Analyse DDR par équipe")
-        df_team = df_ddr.groupby("TEAM").agg(
-            Moyenne_DDR=pd.NamedAgg(column="DDR", aggfunc="mean"),
-            EcartType_DDR=pd.NamedAgg(column="DDR", aggfunc="std"),
-            Joueurs=pd.NamedAgg(column="DDR", aggfunc="count")
-        ).reset_index().sort_values("Moyenne_DDR", ascending=False)
-        st.dataframe(df_team)
+# Ensuite, en dehors des colonnes, on affiche les résultats en pleine largeur
+if show_indiv:
+    st.subheader(f"Classement DDR individuel ({season})")
+    st.dataframe(df_ddr)
 
-with col3:
-    if st.button("Graphique individuel"):
-        st.subheader("Scatter : DDR vs Minutes")
-        chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
-            x=alt.X('DDR', title='DDR'),
-            y=alt.Y('MIN', title='Minutes'),
-            color=alt.Color('Nom', title='Joueur'),
-            tooltip=['Prénom','Nom','TEAM','MIN','DDR','Rank DDR']
-        ).interactive()
-        st.altair_chart(chart, use_container_width=True)
+if show_team:
+    st.subheader("Analyse DDR par équipe")
+    df_team = df_ddr.groupby("TEAM").agg(
+        Moyenne_DDR=pd.NamedAgg(column="DDR", aggfunc="mean"),
+        EcartType_DDR=pd.NamedAgg(column="DDR", aggfunc="std"),
+        Joueurs=pd.NamedAgg(column="DDR", aggfunc="count")
+    ).reset_index().sort_values("Moyenne_DDR", ascending=False)
+    st.dataframe(df_team)
 
-        st.subheader("Histogramme de la distribution des DDR")
-        hist = alt.Chart(df_ddr).mark_bar().encode(
-            alt.X("DDR", bin=alt.Bin(maxbins=30), title="DDR"),
-            alt.Y("count()", title="Nombre de joueurs"),
-            tooltip=["count()"]
-        ).properties(width=600, height=400)
-        st.altair_chart(hist, use_container_width=True)
+if show_graph_indiv:
+    st.subheader("Scatter : DDR vs Minutes")
+    chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
+        x=alt.X('DDR', title='DDR'),
+        y=alt.Y('MIN', title='Minutes'),
+        color=alt.Color('Nom', title='Joueur'),
+        tooltip=['Prénom','Nom','TEAM','MIN','DDR','Rank DDR']
+    ).interactive()
+    st.altair_chart(chart, use_container_width=True)
 
-with col4:
-    if st.button("Graphique collectif"):
-        st.subheader("Bar chart des moyennes DDR par équipe")
-        df_team = df_ddr.groupby("TEAM").agg(
-            Moyenne_DDR=pd.NamedAgg(column="DDR", aggfunc="mean"),
-            EcartType_DDR=pd.NamedAgg(column="DDR", aggfunc="std"),
-            Joueurs=pd.NamedAgg(column="DDR", aggfunc="count")
-        ).reset_index().sort_values("Moyenne_DDR", ascending=False)
+    st.subheader("Histogramme de la distribution des DDR")
+    hist = alt.Chart(df_ddr).mark_bar().encode(
+        alt.X("DDR", bin=alt.Bin(maxbins=30), title="DDR"),
+        alt.Y("count()", title="Nombre de joueurs"),
+        tooltip=["count()"]
+    ).properties(width=600, height=400)
+    st.altair_chart(hist, use_container_width=True)
 
-        chart_team = alt.Chart(df_team).mark_bar().encode(
-            x=alt.X("TEAM", sort="-y", title="Équipe"),
-            y=alt.Y("Moyenne_DDR", title="Moyenne DDR"),
-            tooltip=["TEAM","Moyenne_DDR","EcartType_DDR","Joueurs"]
-        ).properties(width=700, height=400)
+if show_graph_team:
+    st.subheader("Bar chart des moyennes DDR par équipe")
+    df_team = df_ddr.groupby("TEAM").agg(
+        Moyenne_DDR=pd.NamedAgg(column="DDR", aggfunc="mean"),
+        EcartType_DDR=pd.NamedAgg(column="DDR", aggfunc="std"),
+        Joueurs=pd.NamedAgg(column="DDR", aggfunc="count")
+    ).reset_index().sort_values("Moyenne_DDR", ascending=False)
 
-        st.altair_chart(chart_team, use_container_width=True)
+    chart_team = alt.Chart(df_team).mark_bar().encode(
+        x=alt.X("TEAM", sort="-y", title="Équipe"),
+        y=alt.Y("Moyenne_DDR", title="Moyenne DDR"),
+        tooltip=["TEAM","Moyenne_DDR","EcartType_DDR","Joueurs"]
+    ).properties(width=700, height=400)
 
-
+    st.altair_chart(chart_team, use_container_width=True)
