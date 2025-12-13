@@ -10,7 +10,7 @@ import altair as alt
 W_STEAL = 1.0
 W_BLOCK = 0.9
 W_DEFLECTION = 0.6
-W_FOUL = 1.2  # poids du volume de fautes (négatif appliqué dans le noyau)
+W_FOUL = 1.2  # poids du volume de fautes
 
 # -----------------------------
 # Chargement OppPtsPoss + 4 facteurs depuis Excel
@@ -52,7 +52,7 @@ def fetch_opp_excel(path):
     return df_opp
 
 # -----------------------------
-# Calcul DDR unique (signé + contextes + calibration)
+# Calcul DDR unique
 # -----------------------------
 def compute_ddr(df_indiv, df_opp):
     df_indiv['PLAYER'] = df_indiv['PLAYER'].str.strip().str.upper()
@@ -66,14 +66,12 @@ def compute_ddr(df_indiv, df_opp):
 
     # Volumes
     df['VolPos'] = W_STEAL * df['STL'] + W_BLOCK * df['BLK'] + W_DEFLECTION * df['DEFLECTIONS']
-    df['VolNeg'] = W_FOUL * df['PF']  # utilisé dans le noyau signé
+    df['VolNeg'] = W_FOUL * df['PF']
 
-    # Noyau signé (log-ratio, robuste aux extrêmes)
-    # Positif si VolPos domine, négatif si les fautes (VolNeg) dominent
-    eps = 1e-6
+    # Noyau signé (log-ratio)
     df['core'] = np.log((df['VolPos'] + 1.0) / (df['VolNeg'] + 1.0))
 
-    # Contexte individuel à partir des % (robuste: médiane + IQR)
+    # Contexte individuel (robuste)
     def robust_z(series):
         med = series.median()
         iqr = series.quantile(0.75) - series.quantile(0.25)
@@ -84,26 +82,24 @@ def compute_ddr(df_indiv, df_opp):
     z_pf  = robust_z(df['PF%'])
 
     ind_raw = 0.8 * z_stl + 0.6 * z_blk - 0.7 * z_pf
-    # Multiplieur borné via tanh (≈ 0.8 à 1.2)
     df['ContextE'] = 1.0 + 0.2 * np.tanh(ind_raw)
 
-    # Contexte collectif: 4 facteurs + opp pts/poss (compressé)
+    # Contexte collectif
     team_4f = (
         1.1 * (1.0 - df['OPP_EFG%']) +
         1.3 * df['OPP_TOV%'] +
         1.0 * (1.0 - df['OPP_ORB%']) +
         1.1 * (1.0 - df['OPP_FTR'])
     )
-    z_opp_ppp = robust_z(df['OPPPTSPOSS'])  # plus bas est mieux
+    z_opp_ppp = robust_z(df['OPPPTSPOSS'])
     team_raw = team_4f - 0.3 * z_opp_ppp
-    df['ContextTeam'] = 1.0 + 0.15 * np.tanh(team_raw)  # ≈ 0.85 à 1.15
+    df['ContextTeam'] = 1.0 + 0.15 * np.tanh(team_raw)
 
-    # Calibration globale: recentrer core et échelle par IQR, puis appliquer contextes
+    # Calibration globale
     core_med = df['core'].median()
     core_iqr = df['core'].quantile(0.75) - df['core'].quantile(0.25)
     core_norm = (df['core'] - core_med) / (core_iqr if core_iqr > 0 else 1e-6)
 
-    # Échelle finale pour lisibilité; ajuste si besoin (2.3–3.0)
     df['DDR'] = (4.0 * core_norm) * df['ContextE'] * df['ContextTeam']
     df['DDR'] = df['DDR'].clip(-3, 10)
 
@@ -120,7 +116,7 @@ def compute_ddr(df_indiv, df_opp):
 st.title("Defensive Disruption Rate (DDR) — Saison sélectionnable, DDR unique")
 
 st.info("""
-- **DDR unique**: noyau signé (log-ratio VolPos vs VolNeg) corrigé par contexte individuel (% STL/BLK/PF) et collectif (4 facteurs + opp pts/poss).
+- **DDR unique**: log-ratio VolPos vs VolNeg corrigé par contexte individuel (% STL/BLK/PF) et collectif (4 facteurs + opp pts/poss).
 - **Calibration**: centrage par médiane + échelle IQR, compression par tanh pour lisibilité.
 - Échelle cible: environ -3 à +10.
 """)
@@ -130,7 +126,9 @@ season = st.selectbox(
     options=["2024-25", "2025-26"],
     index=1
 )
-min_threshold = st.slider("Minutes minimum", 0, 2000, 500, 500, 50)
+
+# ✅ Correction du slider
+min_threshold = st.slider("Minutes minimum", 0, 2000, 500, step=50)
 selected_team = st.text_input("Équipe (laisser vide pour toutes)", value="")
 
 @st.cache_data
@@ -161,9 +159,9 @@ if st.button("Générer DDR"):
             "text/csv"
         )
 
-        st.subheader("Scatter : DDR")
+        st.subheader("Scatter : DDR vs Minutes")
         chart = alt.Chart(df_ddr).mark_circle(size=80).encode(
-            x=alt.X('DDR', title='DDR (log-ratio VolPos/VolNeg × ContextE × ContextTeam)'),
+            x=alt.X('DDR', title='DDR'),
             y=alt.Y('MIN', title='Minutes'),
             color=alt.Color('Nom', title='Joueur'),
             tooltip=['Prénom','Nom','TEAM','MIN','DDR','Rank DDR']
