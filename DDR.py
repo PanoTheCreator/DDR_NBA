@@ -170,7 +170,7 @@ if st.button("Générer DDR"):
         st.altair_chart(hist, use_container_width=True)
 
         # -----------------------------
-        # Analyse par équipe (NamedAgg)
+        # Analyse par équipe
         # -----------------------------
         st.subheader("Analyse DDR par équipe")
 
@@ -187,4 +187,6 @@ if st.button("Générer DDR"):
             y=alt.Y("Moyenne_DDR", title="Moyenne DDR"),
             tooltip=["TEAM","Moyenne_DDR","EcartType_DDR","Joueurs"]
         ).properties(width=700, height=400)
+
         st.altair_chart(chart_team, use_container_width=True)
+
