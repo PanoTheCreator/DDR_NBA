@@ -10,7 +10,7 @@ import altair as alt
 W_STEAL = 1.0
 W_BLOCK = 0.9
 W_DEFLECTION = 0.6
-W_FOUL = 1.2  # poids du volume de fautes
+W_FOUL = 1.2
 
 # -----------------------------
 # Chargement OppPtsPoss + 4 facteurs depuis Excel
@@ -31,7 +31,6 @@ def fetch_opp_excel(path):
         'OPP_FT RATE': 'OPP_FTR'
     })
 
-    # Conversion en numérique
     for col in ['STL%','BLK%','PF%','DEFLECTIONS','OPPPTSPOSS','OPP_EFG%','OPP_TOV%','OPP_ORB%','OPP_FTR']:
         if col in df_opp.columns:
             df_opp[col] = (
@@ -41,12 +40,10 @@ def fetch_opp_excel(path):
             )
             df_opp[col] = pd.to_numeric(df_opp[col], errors='coerce')
 
-    # Convertir % en décimales
     for col in ['STL%','BLK%','PF%','OPP_EFG%','OPP_TOV%','OPP_ORB%','OPP_FTR']:
         if col in df_opp.columns:
             df_opp[col] = df_opp[col] / 100.0
 
-    # Harmonisation des noms
     df_opp['PLAYER'] = df_opp['PLAYER'].str.strip().str.upper()
     df_opp = df_opp.drop_duplicates(subset='PLAYER', keep='first')
     return df_opp
@@ -58,20 +55,16 @@ def compute_ddr(df_indiv, df_opp):
     df_indiv['PLAYER'] = df_indiv['PLAYER'].str.strip().str.upper()
     df = pd.merge(df_indiv, df_opp, on='PLAYER', how='left')
 
-    # Remplissage des NaN
     for col in ['STL','BLK','PF','MIN','GP','DEFLECTIONS','OPPPTSPOSS',
                 'STL%','BLK%','PF%','OPP_EFG%','OPP_TOV%','OPP_ORB%','OPP_FTR']:
         if col in df.columns:
             df[col] = df[col].fillna(0.0)
 
-    # Volumes
     df['VolPos'] = W_STEAL * df['STL'] + W_BLOCK * df['BLK'] + W_DEFLECTION * df['DEFLECTIONS']
     df['VolNeg'] = W_FOUL * df['PF']
 
-    # Noyau signé (log-ratio)
     df['core'] = np.log((df['VolPos'] + 1.0) / (df['VolNeg'] + 1.0))
 
-    # Contexte individuel (robuste)
     def robust_z(series):
         med = series.median()
         iqr = series.quantile(0.75) - series.quantile(0.25)
@@ -84,7 +77,6 @@ def compute_ddr(df_indiv, df_opp):
     ind_raw = 0.8 * z_stl + 0.6 * z_blk - 0.7 * z_pf
     df['ContextE'] = 1.0 + 0.2 * np.tanh(ind_raw)
 
-    # Contexte collectif
     team_4f = (
         1.1 * (1.0 - df['OPP_EFG%']) +
         1.3 * df['OPP_TOV%'] +
@@ -95,16 +87,13 @@ def compute_ddr(df_indiv, df_opp):
     team_raw = team_4f - 0.3 * z_opp_ppp
     df['ContextTeam'] = 1.0 + 0.15 * np.tanh(team_raw)
 
-    # Standardisation: centrage médiane + échelle IQR
     core_med = df['core'].median()
     core_iqr = df['core'].quantile(0.75) - df['core'].quantile(0.25)
     core_norm = (df['core'] - core_med) / (core_iqr if core_iqr > 0 else 1e-6)
 
-    # DDR final avec échelle cible -5 à +15
     df['DDR'] = (5.0 * core_norm) * df['ContextE'] * df['ContextTeam']
     df['DDR'] = df['DDR'].clip(-5, 15)
 
-    # Présentation
     df['Prénom'] = df['PLAYER'].str.split().str[0].str.capitalize()
     df['Nom'] = df['PLAYER'].str.split().str[1:].str.join(' ').str.capitalize()
 
@@ -178,4 +167,27 @@ if st.button("Générer DDR"):
             alt.Y("count()", title="Nombre de joueurs"),
             tooltip=["count()"]
         ).properties(width=600, height=400)
-        st.altair
+        st.altair_chart(hist, use_container_width=True)
+
+        # -----------------------------
+# Analyse par équipe
+# -----------------------------
+st.subheader("Analyse DDR par équipe")
+
+# Moyenne et écart-type par équipe
+df_team = df_ddr.groupby("TEAM").agg(
+    Moyenne_DDR=("DDR", "mean"),
+    EcartType_DDR=("DDR", "std"),
+    Joueurs=("DDR", "count")
+).reset_index().sort_values("Moyenne_DDR", ascending=False)
+
+st.dataframe(df_team)
+
+# Bar chart des moyennes par équipe
+chart_team = alt.Chart(df_team).mark_bar().encode(
+    x=alt.X("TEAM", sort="-y", title="Équipe"),
+    y=alt.Y("Moyenne_DDR", title="Moyenne DDR"),
+    tooltip=["TEAM","Moyenne_DDR","EcartType_DDR","Joueurs"]
+).properties(width=700, height=400)
+
+st.altair_chart(chart_team, use_container_width=True)
