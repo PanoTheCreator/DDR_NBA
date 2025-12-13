@@ -95,8 +95,14 @@ def compute_ddr(df_indiv, df_opp):
     team_raw = team_4f - 0.3 * z_opp_ppp
     df['ContextTeam'] = 1.0 + 0.15 * np.tanh(team_raw)
 
-    # DDR final (brut, sans standardisation ni clipping)
-    df['DDR'] = (df['core']) * df['ContextE'] * df['ContextTeam']
+    # Standardisation: centrage médiane + échelle IQR
+    core_med = df['core'].median()
+    core_iqr = df['core'].quantile(0.75) - df['core'].quantile(0.25)
+    core_norm = (df['core'] - core_med) / (core_iqr if core_iqr > 0 else 1e-6)
+
+    # DDR final avec échelle cible -5 à +15
+    df['DDR'] = (5.0 * core_norm) * df['ContextE'] * df['ContextTeam']
+    df['DDR'] = df['DDR'].clip(-5, 15)
 
     # Présentation
     df['Prénom'] = df['PLAYER'].str.split().str[0].str.capitalize()
@@ -117,7 +123,7 @@ st.title("Defensive Disruption Rate (DDR) — Saison sélectionnable, DDR unique
 st.info("""
 - **DDR unique**: log-ratio VolPos vs VolNeg corrigé par contexte individuel (% STL/BLK/PF) et collectif (4 facteurs + opp pts/poss).
 - **Calibration**: centrage par médiane + échelle IQR, compression par tanh pour lisibilité.
-- ⚠️ Pas de standardisation ni clipping: tu vois les valeurs brutes.
+- **Échelle cible**: environ -5 à +15.
 """)
 
 season = st.selectbox(
@@ -172,4 +178,4 @@ if st.button("Générer DDR"):
             alt.Y("count()", title="Nombre de joueurs"),
             tooltip=["count()"]
         ).properties(width=600, height=400)
-        st.altair_chart(hist, use_container_width=True)
+        st.altair
