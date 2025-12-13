@@ -170,24 +170,12 @@ if st.button("Générer DDR"):
         st.altair_chart(hist, use_container_width=True)
 
         # -----------------------------
-# Analyse par équipe
-# -----------------------------
-st.subheader("Analyse DDR par équipe")
+        # Analyse par équipe
+        # -----------------------------
+        st.subheader("Analyse DDR par équipe")
 
-# Moyenne et écart-type par équipe
-df_team = df_ddr.groupby("TEAM").agg(
-    Moyenne_DDR=("DDR", "mean"),
-    EcartType_DDR=("DDR", "std"),
-    Joueurs=("DDR", "count")
-).reset_index().sort_values("Moyenne_DDR", ascending=False)
-
-st.dataframe(df_team)
-
-# Bar chart des moyennes par équipe
-chart_team = alt.Chart(df_team).mark_bar().encode(
-    x=alt.X("TEAM", sort="-y", title="Équipe"),
-    y=alt.Y("Moyenne_DDR", title="Moyenne DDR"),
-    tooltip=["TEAM","Moyenne_DDR","EcartType_DDR","Joueurs"]
-).properties(width=700, height=400)
-
-st.altair_chart(chart_team, use_container_width=True)
+        df_team = df_ddr.groupby("TEAM").agg(
+            Moyenne_DDR=("DDR", "mean"),
+            EcartType_DDR=("DDR", "std"),
+            Joueurs=("DDR", "count")
+        ).reset_index
